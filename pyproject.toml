@@ -1,0 +1,15 @@
+# ---------------------------------------------------------------------------
+# SAMPARK — tooling configuration
+#
+# This file is CONFIGURATION ONLY. It deliberately declares no [project] and no
+# [build-system] table, so SAMPARK is not an installable package and no build
+# backend is involved. Test imports resolve via the root conftest.py instead.
+#
+# Later phases may add [tool.ruff] / [tool.mypy] here rather than adding more
+# dotfiles at the repo root.
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"

@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# SAMPARK — repository ignore rules
+# ---------------------------------------------------------------------------
+
+# --- Secrets and credentials ------------------------------------------------
+# The most important block in this file. Real Razorpay keys (rzp_test_*/rzp_live_*)
+# and the Anthropic API key live in .env and must never be committed.
+# .env.example is the tracked template and is explicitly re-included below.
+.env
+.env.*
+!.env.example
+
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+# Ed25519 agent keypairs (spec §8.1) — private keys never enter the repo.
+*.ed25519
+*_private.json
+
+# --- Python virtual environments --------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# --- Python bytecode and build artifacts ------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# --- Test, coverage and type-checker caches ---------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+
+# --- Docker local artifacts -------------------------------------------------
+# Compose override files are per-machine; the committed compose file is not.
+docker-compose.override.yml
+docker-compose.override.yaml
+.docker/
+# Local bind-mount volume data for Postgres/Redis (spec §7).
+.data/
+pgdata/
+redisdata/
+
+# --- IDE and editor ---------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.antigravity/
+
+# --- OS files ---------------------------------------------------------------
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Logs -------------------------------------------------------------------
+*.log
+logs/
