@@ -6,12 +6,14 @@
 #   .venv\Scripts\python.exe -m pip install -r requirements.txt
 #
 # Phase 0 scope: this file deliberately contains ONLY what the CI job and the
-# Phase 0 test suite require. FastAPI, Pydantic, psycopg, redis, structlog,
-# LightGBM, scikit-learn and the Razorpay SDK arrive in the phase that first
-# uses them (spec §7), not before.
+# Phase 0 test suite require, plus Pydantic — required starting with the
+# domain/API contracts implementation (CONTRACTS.md). FastAPI, psycopg,
+# redis, structlog, LightGBM, scikit-learn and the Razorpay SDK arrive in
+# the phase that first uses them (spec §7), not before.
 #
-# Pins are exact for reproducibility. Re-verify against `pip freeze` after the
-# first real install.
+# Pins are exact for reproducibility, verified against `pip freeze` after
+# the first real install into .venv (Python 3.11.9).
 # ---------------------------------------------------------------------------
 
 pytest==8.3.4
+pydantic==2.13.4
