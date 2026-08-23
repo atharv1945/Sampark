@@ -89,8 +89,10 @@ Related to `Agent` 1:1 (`AGENT \|\|--\|\| CAPABILITY_SCOPE : "declares"`).
 values — `allowed_channels` an array of channel-name strings,
 `allowed_intents` an array of intent-name strings, `allowed_risk_sources` an
 array of risk-source-name strings. This describes the array's element shape,
-not a change to the canonical field type, which remains `json`/`JSONB`. No
-specific channel/intent/risk-source enum vocabulary is enumerated here.
+not a change to the canonical field type, which remains `json`/`JSONB`.
+These fields are represented as arrays of strings in the application layer.
+A closed enum vocabulary may be introduced only after the exact allowed
+values are explicitly approved; it must not be expanded silently.
 
 ### Customer
 
