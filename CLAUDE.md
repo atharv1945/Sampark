@@ -374,16 +374,20 @@ passing.*
 Status at time of writing:
 
 - **Done:** repo skeleton, uppercase doc names, `.gitignore` (secrets-first),
-  `.env.example` (names only), `requirements.txt` (pytest only),
-  `pyproject.toml` (pytest config only, no packaging tables), CI workflow
-  pinned to Python 3.11, two Phase 0 tests, root `conftest.py`.
-- **Not done:** `.venv` — blocked pending a python.org 3.11.9 install (the only
-  3.11 on the machine is a Microsoft Store build whose version-stamped path
-  breaks a venv on Store update).
-- **Not done:** the Razorpay test-mode payment link half of the exit criterion —
-  deferred by decision, along with Razorpay MCP setup.
-- **Not started:** the hand-written Postgres schema and Pydantic contracts
-  (human-owned, §3).
+  `.env.example` (names only), `requirements.txt` (pytest, pydantic, and
+  razorpay — no longer pytest-only), `pyproject.toml` (pytest config only,
+  no packaging tables), CI workflow pinned to Python 3.11, two Phase 0
+  tests, root `conftest.py`, Python 3.11.9 install and `.venv`, pytest
+  foundation, `CLAUDE.md`, `CONTRACTS.md`, the hand-authored Phase 0
+  Postgres schema, Pydantic/domain contracts, contract tests.
+- **Done:** Razorpay test account created; Razorpay test API Key ID + Key
+  Secret configured locally in `.env` (gitignored); Razorpay Remote MCP
+  configured and authenticated (`claude mcp list` reports connected; `/mcp`
+  shows Status: connected, Auth: authenticated, Capabilities: tools, Tools: 42);
+  Razorpay Python SDK integration implemented; one real Razorpay test-mode
+  Payment Link created programmatically through Python via the Razorpay SDK
+  and confirmed by fetching the resulting link by ID.
+- **Not done:** final Phase 0 CI verification / exit gate.
 - **Note:** `docker compose` infrastructure has not been started; the Docker
   daemon is not currently running.
 

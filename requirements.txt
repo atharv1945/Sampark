@@ -7,9 +7,10 @@
 #
 # Phase 0 scope: this file deliberately contains ONLY what the CI job and the
 # Phase 0 test suite require, plus Pydantic — required starting with the
-# domain/API contracts implementation (CONTRACTS.md). FastAPI, psycopg,
-# redis, structlog, LightGBM, scikit-learn and the Razorpay SDK arrive in
-# the phase that first uses them (spec §7), not before.
+# domain/API contracts implementation (CONTRACTS.md) — and the Razorpay SDK,
+# required for the Phase 0 test-mode payment-link exit criterion. FastAPI,
+# psycopg, redis, structlog, LightGBM and scikit-learn arrive in the phase
+# that first uses them (spec §7), not before.
 #
 # Pins are exact for reproducibility, verified against `pip freeze` after
 # the first real install into .venv (Python 3.11.9).
@@ -17,3 +18,4 @@
 
 pytest==8.3.4
 pydantic==2.13.4
+razorpay==2.0.1
