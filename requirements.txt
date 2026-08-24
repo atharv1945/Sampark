@@ -8,9 +8,14 @@
 # Phase 0 scope: this file deliberately contains ONLY what the CI job and the
 # Phase 0 test suite require, plus Pydantic — required starting with the
 # domain/API contracts implementation (CONTRACTS.md) — and the Razorpay SDK,
-# required for the Phase 0 test-mode payment-link exit criterion. FastAPI,
-# psycopg, redis, structlog, LightGBM and scikit-learn arrive in the phase
-# that first uses them (spec §7), not before.
+# required for the Phase 0 test-mode payment-link exit criterion.
+#
+# Phase 1 scope (data spine, spec §7/§18.1): NumPy/Pandas for the seeded
+# simulator; PyYAML for the versioned root-cause lookup table
+# (sampark/rootcause/taxonomy.yaml); psycopg to load the generated ledger
+# into the real PostgreSQL 16 instance (docker-compose.yml, schema applied
+# separately). FastAPI, redis, structlog, LightGBM and scikit-learn still
+# arrive in the phase that first uses them, not before.
 #
 # Pins are exact for reproducibility, verified against `pip freeze` after
 # the first real install into .venv (Python 3.11.9).
@@ -19,3 +24,7 @@
 pytest==8.3.4
 pydantic==2.13.4
 razorpay==2.0.1
+numpy==2.4.6
+pandas==3.0.5
+pyyaml==6.0.3
+psycopg[binary]==3.3.4

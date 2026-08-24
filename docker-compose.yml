@@ -1,0 +1,55 @@
+# ---------------------------------------------------------------------------
+# SAMPARK — local development infrastructure
+#
+# Phase 1 infrastructure only: PostgreSQL 16 (at-risk ledger, spec §7) and
+# Redis (budget counters / rolling windows / reservations, spec §7).
+#
+# Deliberately excludes: any application service, migration/seed service,
+# pgAdmin, RedisInsight. Those are out of scope for this compose file — see
+# CLAUDE.md §2 (ask before introducing infra beyond the locked stack) and
+# the Phase 1 infrastructure task that authored this file.
+#
+# Schema initialization is NOT automatic. sampark/schema.sql is hand-authored
+# and human-owned (CLAUDE.md §3); nothing here mounts it into
+# /docker-entrypoint-initdb.d. Applying it is a deliberate, explicit, later
+# step (e.g. `psql ... -f sampark/schema.sql`), not a side effect of `up`.
+#
+# Credentials are never hard-coded here — every value comes from the
+# environment (.env, gitignored; see .env.example for the tracked template).
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7.4
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres_data:

@@ -1,0 +1,50 @@
+# SAMPARK root-cause lookup table — spec §8.3.
+#
+# "Raw failure context maps onto a fixed taxonomy ... This was originally an
+# LLM call. It was cut. Gateway error code -> failure class is a lookup
+# table ... The mapping lives in a versioned YAML file with a test per
+# entry, and anything unmapped falls to `unknown` and is counted in a
+# metric."
+#
+# context_code values below are SYNTHETIC — illustrative gateway/context
+# codes for the Phase 1 simulator, not verified live Razorpay API payloads.
+# Any context_code not listed under its source falls to `unknown`
+# (default, below), never to an exception or a guess.
+
+version: 1
+
+taxonomy:
+  - insufficient_funds
+  - issuer_downtime
+  - mandate_expired
+  - authentication_drop
+  - price_hesitation
+  - intent_lost
+  - disputed
+  - unknown
+
+default: unknown
+
+sources:
+  failed_payment:
+    BAD_REQUEST_ERROR: authentication_drop
+    GATEWAY_ERROR: issuer_downtime
+    SERVER_ERROR: issuer_downtime
+    INSUFFICIENT_FUNDS: insufficient_funds
+    AUTHENTICATION_FAILED: authentication_drop
+
+  mandate_failure:
+    INSUFFICIENT_FUNDS: insufficient_funds
+    MANDATE_EXPIRED: mandate_expired
+    AUTH_DECLINED: authentication_drop
+    ISSUER_DOWN: issuer_downtime
+
+  abandoned_checkout:
+    PRICE_SHOWN_HIGH: price_hesitation
+    CART_IDLE_TIMEOUT: intent_lost
+    PAYMENT_PAGE_ABANDONED: intent_lost
+
+  overdue_invoice:
+    DISPUTE_RAISED: disputed
+    NO_RESPONSE: intent_lost
+    PARTIAL_PAYMENT_STALLED: price_hesitation
