@@ -14,8 +14,14 @@
 # simulator; PyYAML for the versioned root-cause lookup table
 # (sampark/rootcause/taxonomy.yaml); psycopg to load the generated ledger
 # into the real PostgreSQL 16 instance (docker-compose.yml, schema applied
-# separately). FastAPI, redis, structlog, LightGBM and scikit-learn still
-# arrive in the phase that first uses them, not before.
+# separately).
+#
+# Phase 3 scope (Agent Registry, spec §8.1): PyNaCl for Ed25519 keypair
+# generation and detached-signature verification (sampark/registry/keys.py,
+# signing.py) — chosen over `cryptography` as the smaller, purpose-built
+# dependency (bundled libsodium wheels, no OpenSSL/X.509 stack this
+# project has no other use for). FastAPI, redis, structlog, LightGBM and
+# scikit-learn still arrive in the phase that first uses them, not before.
 #
 # Pins are exact for reproducibility, verified against `pip freeze` after
 # the first real install into .venv (Python 3.11.9).
@@ -28,3 +34,4 @@ numpy==2.4.6
 pandas==3.0.5
 pyyaml==6.0.3
 psycopg[binary]==3.3.4
+pynacl==1.5.0
