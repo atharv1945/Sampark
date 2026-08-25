@@ -13,3 +13,6 @@
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers"
+markers = [
+    "postgres: requires a live PostgreSQL instance (Design Lock §12, §20) — must run in CI, never silently skip",
+]

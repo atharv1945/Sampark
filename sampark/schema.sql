@@ -1,15 +1,14 @@
 -- ---------------------------------------------------------------------------
--- SAMPARK — Phase 0 physical schema (PostgreSQL 16)
+-- SAMPARK — physical schema (PostgreSQL 16)
 --
 -- Source of truth for canonical entity fields: spec §6.3 (ER diagram).
 -- Application-level contract types (UUID keys, request/grant field shapes):
--- CONTRACTS.md.
+-- CONTRACTS.md. Phase 4 additions (tables 9-12, grants.budget_window_id):
+-- the approved Phase 4 Design Lock §1 / PHASE4_SCHEMA_AND_ISSUANCE_PROPOSAL.md §A.
 --
 -- Scope: agents, capability_scopes, customers, contact_states, risk_items,
--- grant_requests, grants, audit_events.
---
--- Deliberately NOT created in this phase: merchants, budget_windows.
--- These belong to the budget/mediation implementation phase.
+-- grant_requests, grants, audit_events (Phase 0); merchants, budget_windows,
+-- customer_margin_windows, contact_slot_claims (Phase 4).
 --
 -- Hand-written. Not to be regenerated or redesigned without approval.
 -- ---------------------------------------------------------------------------
@@ -205,11 +204,147 @@ CREATE TABLE audit_events (
 
 
 -- =============================================================================
--- INDEXES (Phase 0 set only — no speculative indexes)
+-- 9. MERCHANTS  (Phase 4 — Design Lock §1.1)
+--    One row in the simulation ('merchant-sim', seeded below). Exists because
+--    spec §6.3 has MERCHANT ||--o{ BUDGET_WINDOW : "funds", and a margin
+--    authority with no owner is not an authority.
 -- =============================================================================
 
+CREATE TABLE merchants (
+    merchant_id     TEXT PRIMARY KEY,
+    display_name    TEXT NOT NULL
+);
+
+
+-- =============================================================================
+-- 10. BUDGET_WINDOWS  (Phase 4 — Design Lock §1.2)
+--     The MERCHANT margin authority — spec §6.3's BUDGET_WINDOW, and the
+--     target of grants.budget_window_id below.
+-- =============================================================================
+
+CREATE TABLE budget_windows (
+    budget_window_id        UUID    PRIMARY KEY,
+    merchant_id              TEXT    NOT NULL REFERENCES merchants (merchant_id) ON DELETE RESTRICT,
+    window_id                DATE    NOT NULL,
+    margin_budget_paise      BIGINT  NOT NULL,
+    margin_reserved_paise    BIGINT  NOT NULL DEFAULT 0,
+    margin_spent_paise       BIGINT  NOT NULL DEFAULT 0,
+
+    CONSTRAINT budget_windows_merchant_window_uniq   UNIQUE (merchant_id, window_id),
+    CONSTRAINT budget_windows_budget_non_negative    CHECK (margin_budget_paise   >= 0),
+    CONSTRAINT budget_windows_reserved_non_negative  CHECK (margin_reserved_paise >= 0),
+    CONSTRAINT budget_windows_spent_non_negative     CHECK (margin_spent_paise    >= 0),
+    CONSTRAINT budget_windows_not_overdrawn
+        CHECK (margin_reserved_paise + margin_spent_paise <= margin_budget_paise)
+);
+
+
+-- =============================================================================
+-- 11. CUSTOMER_MARGIN_WINDOWS  (Phase 4 — Design Lock §1.3)
+--     The CUSTOMER margin authority. Deliberately a separate table, not a
+--     polymorphic scope_key column on budget_windows — the two authorities
+--     have different owners and different FK targets. No FK from grants;
+--     reached by the natural key (grant_requests.customer_id,
+--     budget_windows.window_id).
+--
+--     NOTE (Design Lock §1.3, §18.1): with CONTACT_CAP_24H = 1, a customer
+--     receives at most one grant per window, so this pool cannot bind in the
+--     shipped configuration. Retained because it is the architecturally
+--     correct fix for spec §3 failure 3 and goes live the moment the cap is
+--     relaxed.
+-- =============================================================================
+
+CREATE TABLE customer_margin_windows (
+    customer_margin_window_id   UUID    PRIMARY KEY,
+    customer_id                  TEXT    NOT NULL REFERENCES customers (customer_id) ON DELETE CASCADE,
+    window_id                    DATE    NOT NULL,
+    margin_budget_paise          BIGINT  NOT NULL,
+    margin_reserved_paise        BIGINT  NOT NULL DEFAULT 0,
+    margin_spent_paise           BIGINT  NOT NULL DEFAULT 0,
+
+    CONSTRAINT customer_margin_windows_customer_window_uniq UNIQUE (customer_id, window_id),
+    CONSTRAINT customer_margin_windows_budget_non_negative   CHECK (margin_budget_paise   >= 0),
+    CONSTRAINT customer_margin_windows_reserved_non_negative CHECK (margin_reserved_paise >= 0),
+    CONSTRAINT customer_margin_windows_spent_non_negative    CHECK (margin_spent_paise    >= 0),
+    CONSTRAINT customer_margin_windows_not_overdrawn
+        CHECK (margin_reserved_paise + margin_spent_paise <= margin_budget_paise)
+);
+
+
+-- =============================================================================
+-- 12. CONTACT_SLOT_CLAIMS  (Phase 4 — Design Lock §1.4)
+--     The contention key. A PARTIAL unique index, not a plain UNIQUE: a
+--     ROLLED_BACK or EXPIRED claim must free the window for a retry (spec
+--     §12.3's provider-timeout failure) — a plain UNIQUE would permanently
+--     burn the window on the first provider failure.
+-- =============================================================================
+
+CREATE TABLE contact_slot_claims (
+    claim_id        UUID        PRIMARY KEY,
+    customer_id     TEXT        NOT NULL REFERENCES customers (customer_id) ON DELETE CASCADE,
+    window_id       DATE        NOT NULL,
+    grant_id        UUID        NOT NULL UNIQUE REFERENCES grants (grant_id) ON DELETE RESTRICT,
+    state           TEXT        NOT NULL,
+    claimed_at      TIMESTAMPTZ NOT NULL,
+    released_at     TIMESTAMPTZ,
+
+    CONSTRAINT contact_slot_claims_state_valid CHECK (
+        state IN ('RESERVED', 'EXECUTING', 'CONFIRMED', 'ROLLED_BACK', 'EXPIRED')
+    ),
+    CONSTRAINT contact_slot_claims_released_iff_terminal CHECK (
+        (state IN ('ROLLED_BACK', 'EXPIRED')            AND released_at IS NOT NULL)
+     OR (state IN ('RESERVED', 'EXECUTING', 'CONFIRMED') AND released_at IS NULL)
+    )
+);
+
+-- THE constraint. One active claim per customer per window, enforced by
+-- PostgreSQL, not application logic (Design Lock §11's central guarantee).
+CREATE UNIQUE INDEX contact_slot_claims_active_uniq
+    ON contact_slot_claims (customer_id, window_id)
+    WHERE state IN ('RESERVED', 'EXECUTING', 'CONFIRMED');
+
+
+-- =============================================================================
+-- 7 (extended). GRANTS.budget_window_id  (Phase 4 — Design Lock §1.5)
+--     Satisfies GRANT }o--|| BUDGET_WINDOW : "draws from". No other change to
+--     grants — in particular, no customer_id: contact_slot_claims owns that
+--     key (Design Lock §1.4/§19.3, deliberately not reversing the Phase 0
+--     decision that grants excludes customer_id).
+-- =============================================================================
+
+ALTER TABLE grants
+    ADD COLUMN budget_window_id UUID NOT NULL
+        REFERENCES budget_windows (budget_window_id) ON DELETE RESTRICT;
+
+
+-- =============================================================================
+-- INDEXES
+-- =============================================================================
+
+-- Phase 0 set.
 CREATE INDEX idx_risk_items_customer_id ON risk_items (customer_id);
 CREATE INDEX idx_grant_requests_agent_id ON grant_requests (agent_id);
 CREATE INDEX idx_grant_requests_customer_id ON grant_requests (customer_id);
 CREATE INDEX idx_grant_requests_risk_id ON grant_requests (risk_id);
 CREATE INDEX idx_audit_events_occurred_at ON audit_events (occurred_at);
+
+-- Phase 4 set — supports the authoritative rolling-cap query (Design Lock
+-- §3.4, §11 step 4): grants JOIN grant_requests ON request_id, filtered by
+-- grant_requests.customer_id (already indexed above) and grants.state /
+-- grants.send_after.
+CREATE INDEX idx_grants_state_send_after ON grants (state, send_after);
+CREATE INDEX idx_contact_slot_claims_customer_window ON contact_slot_claims (customer_id, window_id);
+CREATE INDEX idx_budget_windows_merchant_window ON budget_windows (merchant_id, window_id);
+CREATE INDEX idx_customer_margin_windows_customer_window ON customer_margin_windows (customer_id, window_id);
+
+
+-- =============================================================================
+-- REFERENCE DATA  (Phase 4)
+-- =============================================================================
+
+-- The simulation's single merchant. Not dynamically created per request —
+-- unlike budget_windows/customer_margin_windows, which the issuance
+-- transaction creates lazily on first use per window (Design Lock §1.7).
+INSERT INTO merchants (merchant_id, display_name)
+VALUES ('merchant-sim', 'SAMPARK Simulation Merchant')
+ON CONFLICT (merchant_id) DO NOTHING;
