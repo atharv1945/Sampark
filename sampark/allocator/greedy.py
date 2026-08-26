@@ -150,6 +150,13 @@ def allocate_window(
         by_customer[candidate.customer_id].append(candidate)
 
     outcomes: list[AllocationOutcome] = []
+    # Phase 5 U-3 (data-threading only): the ScoreBreakdown each admitted
+    # candidate was ALREADY scored with below, keyed by risk_id so the
+    # winner-selection loop and the loser/deferred path further down can
+    # attach the real, already-computed score to their AllocationOutcome
+    # instead of leaving it None. Nothing here changes what is computed
+    # or when — only that the result is kept instead of discarded.
+    score_breakdown_by_risk_id: dict[str, scoring.ScoreBreakdown] = {}
 
     for customer_id in sorted(by_customer):
         cands = sorted(by_customer[customer_id], key=lambda c: c.risk_item.risk_id)
@@ -168,6 +175,7 @@ def allocate_window(
                 n,
                 tuple(item.amount_paise for item in other_open),
             )
+            score_breakdown_by_risk_id[candidate.risk_item.risk_id] = score_breakdown
             if score_breakdown.expected_net_paise <= 0 and not fifo_mode:
                 ledger.mark_terminally_denied(candidate.risk_item.risk_id)
                 outcomes.append(
@@ -197,9 +205,17 @@ def allocate_window(
         winner_candidate: Candidate | None = None
         winner_grant: Grant | None = None
         winner_effective_bps: int | None = None
+        winner_score: scoring.ScoreBreakdown | None = None
         attempted_denials: dict[str, tuple[str, datetime]] = {}
 
         for score_val, candidate in admitted:
+            # Phase 5 U-3: the score this SPECIFIC attempt is actually
+            # scored under — starts as the admission-time score, and is
+            # replaced below with the recomputed one IFF a downgrade
+            # happens, so it always reflects the terms actually attempted
+            # (existing Phase 4 behavior; only the capture is new).
+            current_score = score_breakdown_by_risk_id[candidate.risk_item.risk_id]
+
             merchant_remaining, customer_remaining = ledger.remaining_margin_paise(
                 candidate.customer_id, candidate.window_id
             )
@@ -220,6 +236,7 @@ def allocate_window(
                 downgraded_score = scoring.score(
                     candidate, effective_bps, n, tuple(item.amount_paise for item in other_open)
                 )
+                current_score = downgraded_score
                 if downgraded_score.expected_net_paise <= 0:
                     reason = (
                         MERCHANT_MARGIN_EXHAUSTED
@@ -237,6 +254,7 @@ def allocate_window(
                 winner_candidate = candidate
                 winner_grant = result.grant
                 winner_effective_bps = effective_bps
+                winner_score = current_score
                 break
             assert isinstance(result, BudgetDenial)
             next_eligible = result.next_eligible_at or next_window_start(candidate.window_id)
@@ -251,7 +269,7 @@ def allocate_window(
                     next_eligible_at=None,
                     grant=winner_grant,
                     fact_unavailable_reason_codes=(),
-                    score=None,
+                    score=winner_score,
                     rescheduled_candidate=None,
                     effective_incentive_bps=winner_effective_bps,
                 )
@@ -267,6 +285,11 @@ def allocate_window(
                     LOST_TO_HIGHER_EXPECTED_NET,
                     next_window_start(candidate.window_id),
                 )
-            outcomes.append(deferred_or_denied(candidate, reason_code, next_eligible_at, ledger))
+            outcomes.append(
+                deferred_or_denied(
+                    candidate, reason_code, next_eligible_at, ledger,
+                    score=score_breakdown_by_risk_id[candidate.risk_item.risk_id],
+                )
+            )
 
     return tuple(outcomes)

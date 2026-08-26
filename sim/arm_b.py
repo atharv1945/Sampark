@@ -59,7 +59,7 @@ import hashlib
 import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Mapping, Protocol
+from typing import TYPE_CHECKING, Mapping, Protocol
 
 import psycopg
 
@@ -95,6 +95,9 @@ from sim.cli import build_dataset
 from sim.environment import Environment
 from sim.ledger import Ledger
 from sim.persistence import PostgresConfig, load_ledger
+
+if TYPE_CHECKING:
+    from sampark.audit.sink import AuditSink
 
 _AGENTS: tuple[RecoveryAgent, ...] = (
     PaymentRetryAgent(),
@@ -287,6 +290,7 @@ def _run_window_loop(
     lifecycle_adapter: _LifecycleAdapter,
     conn_for_issuance: object,
     run_seed_risk_ids: frozenset[str],
+    audit_sink: "AuditSink | None" = None,
 ) -> tuple[tuple[ContactOutcome, ...], tuple[GrantDecision, ...]]:
     """The mediation algorithm itself — IDENTICAL for both backends. Every
     parameter here is already backend-specific data (a repository, a
@@ -295,7 +299,17 @@ def _run_window_loop(
 
     `run_seed_risk_ids` (Phase 4C hardening, W5) — this run's complete
     risk_id set, threaded to `mediate_window` -> ... -> `issuer.issue_grant`
-    for the authoritative customer-margin-budget query's scoping."""
+    for the authoritative customer-margin-budget query's scoping.
+
+    `audit_sink` (Phase 5, U-2) — `None` by default, unchanged behavior.
+    Threaded straight through to `mediate_window`, which calls it for
+    request/decision/grant-reservation events (the higher-fidelity
+    integration point — see sampark/mediation/service.py's docstring).
+    The two lifecycle events this function's OWN loop can see directly —
+    grant.executing / grant.confirmed, both needing only `grant` +
+    `request`, neither needing an AllocationOutcome — are recorded right
+    alongside the EXISTING `lifecycle_adapter.execute`/`.confirm` calls
+    below, in the same order, with no new control flow."""
     if not all_actions:
         return (), ()
 
@@ -330,7 +344,7 @@ def _run_window_loop(
         result = mediate_window(
             tuple(new_requests), carried_forward, agent_repo, risk_item_repo, mediation_ledger, issuer,
             decision_at, aging_bonus_paise, conn=conn_for_issuance, fifo_mode=fifo_mode,
-            run_seed_risk_ids=run_seed_risk_ids,
+            run_seed_risk_ids=run_seed_risk_ids, audit_sink=audit_sink,
         )
         all_decisions.extend(result.decisions)
 
@@ -349,9 +363,13 @@ def _run_window_loop(
             )
 
             lifecycle_adapter.execute(grant.grant_id, at=grant.send_after)
+            if audit_sink is not None:
+                audit_sink.record_grant_executing(grant, request, grant.send_after)
             _ADAPTERS[grant.channel].send(reconstructed_action)
             outcome = environment.observe(reconstructed_action, risk_items_by_id[request.risk_id])
             lifecycle_adapter.confirm(grant.grant_id, at=grant.send_after, actual_spend_paise=outcome.incentive_paise)
+            if audit_sink is not None:
+                audit_sink.record_grant_confirmed(grant, request, grant.send_after, outcome.incentive_paise)
             outcomes.append(outcome)
 
         carried_forward = result.rescheduled_candidates
@@ -385,6 +403,7 @@ def _run_arm_b_memory(
     seed: int, ledger: Ledger, view: LedgerView, environment: Environment,
     all_actions: list[ContactAction], aging_bonus_paise: int, fifo_mode: bool,
     merchant_budget_paise_per_window: int = MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW,
+    audit_sink: "AuditSink | None" = None,
 ) -> ArmBResult:
     agent_repo, keypairs = _build_agent_registry_memory(seed)
     risk_item_repo = _build_risk_item_repo(ledger)
@@ -399,7 +418,7 @@ def _run_arm_b_memory(
         seed, all_actions, keypairs, agent_repo, risk_item_repo, mediation_ledger, issuer, environment,
         risk_items_by_id, aging_bonus_paise, fifo_mode,
         lifecycle_adapter=_MemoryLifecycleAdapter(mediation_ledger), conn_for_issuance=None,
-        run_seed_risk_ids=run_seed_risk_ids,
+        run_seed_risk_ids=run_seed_risk_ids, audit_sink=audit_sink,
     )
     return ArmBResult(outcomes=outcomes, decisions=decisions, backend=BACKEND_MEMORY)
 
@@ -453,6 +472,7 @@ def _run_arm_b_postgres(
     seed: int, ledger: Ledger, view: LedgerView, environment: Environment,
     all_actions: list[ContactAction], aging_bonus_paise: int, fifo_mode: bool,
     merchant_budget_paise_per_window: int,
+    audit_sink: "AuditSink | None" = None,
 ) -> ArmBResult:
     config = PostgresConfig.from_env()  # raises PostgresConfigError if unset — never caught here
     conn = psycopg.connect(config.conninfo())  # raises psycopg.OperationalError if unreachable — never caught here
@@ -484,7 +504,7 @@ def _run_arm_b_postgres(
             seed, all_actions, keypairs, agent_repo, risk_item_repo, mediation_ledger, issuer, environment,
             risk_items_by_id, aging_bonus_paise, fifo_mode,
             lifecycle_adapter=_PostgresLifecycleAdapter(conn), conn_for_issuance=conn,
-            run_seed_risk_ids=run_seed_risk_ids,
+            run_seed_risk_ids=run_seed_risk_ids, audit_sink=audit_sink,
         )
         return ArmBResult(outcomes=outcomes, decisions=decisions, backend=BACKEND_POSTGRES)
     finally:
@@ -498,12 +518,22 @@ def run_arm_b(
     backend: str = BACKEND_MEMORY,
     merchant_budget_paise_per_window: int = MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW,
     fifo_mode: bool = False,
+    audit_sink: "AuditSink | None" = None,
 ) -> ArmBResult:
     """`backend` defaults to "memory" — EVERY existing call site and unit
     test that calls `run_arm_b(seed)` is unaffected by Blocker 1's
     Postgres support. The official evidence CLI (sim/arm_b_cli.py) is
     the one caller that explicitly passes backend="postgres" and never
-    "memory" — see that module."""
+    "memory" — see that module.
+
+    `audit_sink` (Phase 5, U-2) — `None` by default; every existing call
+    site (including sim/arm_b_cli.py's official evidence path) is
+    unaffected. The caller owns constructing it (e.g.
+    `sampark.audit.sink.PostgresAuditSink(conn)`, pointed at whatever
+    connection/search_path it wants the resulting events durable in) —
+    this function does not construct one itself, so it makes no decision
+    about WHERE audit events go, only whether to call the sink it was
+    given."""
     if backend not in _VALID_BACKENDS:
         raise ValueError(f"backend must be one of {_VALID_BACKENDS}, got {backend!r}")
 
@@ -518,8 +548,9 @@ def run_arm_b(
     if backend == BACKEND_MEMORY:
         return _run_arm_b_memory(
             seed, ledger, view, environment, all_actions, aging_bonus_paise, fifo_mode,
-            merchant_budget_paise_per_window,
+            merchant_budget_paise_per_window, audit_sink=audit_sink,
         )
     return _run_arm_b_postgres(
-        seed, ledger, view, environment, all_actions, aging_bonus_paise, fifo_mode, merchant_budget_paise_per_window
+        seed, ledger, view, environment, all_actions, aging_bonus_paise, fifo_mode, merchant_budget_paise_per_window,
+        audit_sink=audit_sink,
     )

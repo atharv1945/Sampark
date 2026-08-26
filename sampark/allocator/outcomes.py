@@ -59,13 +59,22 @@ def deferred_or_denied(
     next_eligible_at: datetime,
     ledger: Any,  # duck-typed: only .mark_terminally_denied(risk_id) is called
     fact_unavailable_reason_codes: tuple[str, ...] = (),
+    score: "scoring.ScoreBreakdown | None" = None,
 ) -> AllocationOutcome:
     """Applies the deferral-exhaustion rule (Design Lock §7): a candidate
     that would exceed MAX_DEFERRAL_WINDOWS is DENIED (terminal) instead
     of DEFERRED, regardless of WHY it was about to be deferred — a
     hard-policy defer (quiet hours, contact cap, an interlock) and an
     allocator competitive loss (lost to a higher expected_net) age
-    identically."""
+    identically.
+
+    `score` — Phase 5 U-3 (data-threading only, no scoring change): the
+    ALREADY-COMPUTED `ScoreBreakdown` for callers that reached scoring
+    before calling this (sampark.allocator.greedy's competitive-loss
+    path). Defaults to `None`, unchanged, for
+    sampark.mediation.hard_filter's call site — a hard-policy
+    INADMISSIBLE candidate never reaches scoring at all, so attaching a
+    score there would be fabricating one, not threading a real one."""
     if candidate.windows_deferred + 1 >= MAX_DEFERRAL_WINDOWS:
         ledger.mark_terminally_denied(candidate.risk_item.risk_id)
         return AllocationOutcome(
@@ -75,7 +84,7 @@ def deferred_or_denied(
             next_eligible_at=None,
             grant=None,
             fact_unavailable_reason_codes=fact_unavailable_reason_codes,
-            score=None,
+            score=score,
             rescheduled_candidate=None,
         )
     aged = candidate.aged()
@@ -87,6 +96,6 @@ def deferred_or_denied(
         next_eligible_at=next_eligible_at,
         grant=None,
         fact_unavailable_reason_codes=fact_unavailable_reason_codes,
-        score=None,
+        score=score,
         rescheduled_candidate=rescheduled,
     )
