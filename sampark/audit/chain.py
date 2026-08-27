@@ -1,20 +1,26 @@
 """The append-only, hash-chained store — Phase 5A §5, §6, §7, §8.
 
-`audit_events` (sampark/schema.sql, human-owned) already has every column
-this module needs: event_id, event_type, occurred_at, prev_hash,
-agent_signature, reason_code, payload. This module adds NO schema change
-of its own — the `seq` column, the `UNIQUE(prev_hash)` index, and the
-append-only triggers are a proposed owner-authored migration (U-1,
-approved but not yet applied by this session; see
-sampark/audit/schema_proposal.sql). Every function here checks for that
-migration at the point it needs it and fails LOUDLY and specifically —
-`MissingSchemaMigrationError` — rather than silently degrading to a
-weaker, unindexed ordering. "Report the missing schema dependency, don't
-silently skip the exit criterion."
+`audit_events` (sampark/schema.sql, human-owned) already has the seven
+base columns this module needs: event_id, event_type, occurred_at,
+prev_hash, agent_signature, reason_code, payload. This module adds NO
+schema change of its own — the `seq` column, the `UNIQUE(prev_hash)`
+index, and the append-only triggers are U-1, an owner-authored migration
+whose exact DDL lives in sampark/audit/schema_proposal.sql. **U-1 has
+been owner-applied to the live database and verified** (seq, both unique
+indexes, and all three triggers confirmed present on `public.audit_events`)
+— but sampark/schema.sql itself (the human-owned, fresh-checkout-authoritative
+file) has not yet been updated to include it, so a database built from
+schema.sql alone still lacks the migration. Every function here checks
+for that migration at the point it needs it and fails LOUDLY and
+specifically — `MissingSchemaMigrationError` — rather than silently
+degrading to a weaker, unindexed ordering. "Report the missing schema
+dependency, don't silently skip the exit criterion." Folding U-1 into
+sampark/schema.sql itself is an owner action (CLAUDE.md §3 item 1); this
+module does not and must not do it.
 
 Concurrency (Phase 5A §7): one Postgres advisory transaction lock
 (`pg_advisory_xact_lock`), held for the duration of one append. Appenders
-queue; none abort. `UNIQUE(prev_hash)` (once applied) is the structural
+queue; none abort. `UNIQUE(prev_hash)` (live-applied) is the structural
 backstop if the lock is ever bypassed — the lock is the performance path,
 the index is the correctness guarantee. No Redis, no SERIALIZABLE here
 (Phase 5A §7.2 explains why both are the wrong tool for a read-head-then-

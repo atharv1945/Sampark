@@ -1,11 +1,19 @@
 -- ---------------------------------------------------------------------------
--- Phase 5 audit schema migration — PROPOSAL ONLY (U-1, owner-approved,
--- NOT applied by this session).
+-- Phase 5 audit schema migration (U-1).
 --
--- sampark/schema.sql is human-owned (CLAUDE.md §3) and is not modified by
--- this file or by any code in sampark/audit/. This is a convenience
--- extraction the owner can review, adjust, and apply by hand — exactly the
--- role PHASE4_SCHEMA_AND_ISSUANCE_PROPOSAL.md played for Phase 4's tables.
+-- STATUS: owner-applied to the live database and verified — seq, both
+-- unique indexes, and all three append-only triggers confirmed present
+-- on public.audit_events. This file is kept, unmodified, as the durable
+-- record of EXACTLY what was applied.
+--
+-- sampark/schema.sql is human-owned (CLAUDE.md §3) and is NOT modified by
+-- this file or by any code in sampark/audit/ — it still does not contain
+-- this migration's DDL. A database built from sampark/schema.sql alone
+-- (e.g. a fresh checkout) does not yet have U-1; only the specific,
+-- already-running database this was applied to does. Folding this DDL
+-- into sampark/schema.sql itself remains an owner action — exactly the
+-- role PHASE4_SCHEMA_AND_ISSUANCE_PROPOSAL.md played for Phase 4's tables,
+-- which the owner did fold into sampark/schema.sql by hand.
 --
 -- Adds ONE column and enforces THREE invariants PostgreSQL can hold
 -- structurally rather than by application convention (Phase 5A §6):

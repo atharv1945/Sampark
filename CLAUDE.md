@@ -366,31 +366,62 @@ one and present it as settled.
 
 ## 15. Current phase
 
-**Phase 0 — Foundations & Contracts.**
+**Phases 0–5 implemented; closing pass in progress before Phase 6.**
 
-Exit criterion (spec §18.1): *a test-mode payment link created from code, and CI
-passing.*
+Phases 0 through 5 have each demonstrated their spec §18.1 exit criterion
+(payment link + CI; 20k reproducible risk items; Arm A end-to-end metrics;
+scope-only rejection with no allocator involvement; the Phase 4 hard gate
+PASS; and Phase 5's chain/explainability verified live against real
+PostgreSQL). Do not begin Phase 6 work until the items below are closed.
 
-Status at time of writing:
+**Phase 4 evidence (protected — do not alter without an explicit,
+recorded reason):** `constants_commit_sha aa87123aafdc9d812f5a01c04766c60b9198a2ce`;
+mean A ₹/contact 89,387.38 paise; mean B ₹/contact 156,957.37 paise;
+uplift 1.7114–1.8822× across seeds 7, 42, 101, 2024, 31337; all four
+required ablations PASS; Arm B enforced-compliance violations zero
+throughout. Independently reproduced read-only from the already-committed
+`results/*.json` files as part of this closure work — not rerun.
 
-- **Done:** repo skeleton, uppercase doc names, `.gitignore` (secrets-first),
-  `.env.example` (names only), `requirements.txt` (pytest, pydantic, and
-  razorpay — no longer pytest-only), `pyproject.toml` (pytest config only,
-  no packaging tables), CI workflow pinned to Python 3.11, two Phase 0
-  tests, root `conftest.py`, Python 3.11.9 install and `.venv`, pytest
-  foundation, `CLAUDE.md`, `CONTRACTS.md`, the hand-authored Phase 0
-  Postgres schema, Pydantic/domain contracts, contract tests.
-- **Done:** Razorpay test account created; Razorpay test API Key ID + Key
-  Secret configured locally in `.env` (gitignored); Razorpay Remote MCP
-  configured and authenticated (`claude mcp list` reports connected; `/mcp`
-  shows Status: connected, Auth: authenticated, Capabilities: tools, Tools: 42);
-  Razorpay Python SDK integration implemented; one real Razorpay test-mode
-  Payment Link created programmatically through Python via the Razorpay SDK
-  and confirmed by fetching the resulting link by ID.
-- **Not done:** final Phase 0 CI verification / exit gate.
-- **Note:** `docker compose` infrastructure has not been started; the Docker
-  daemon is not currently running.
+**Phase 5 core (audit chain, canonicalization, append-only enforcement,
+emitter, explainability, export, U-1 live-applied, U-2 real integration,
+U-3 score threading, T-26 determinism) is implemented and independently
+verified against real PostgreSQL** — `python -m sampark.audit.verify`
+reports `VALID: True` against the live store.
 
-**Do not begin Phase 1 work until the Phase 0 exit criterion is satisfied.**
+**Still open before Phase 6, in order of what blocks the most:**
+
+1. `sampark/schema.sql` (human-owned — CLAUDE.md §3 item 1) does not yet
+   contain U-1's DDL (`seq`, `UNIQUE(prev_hash)`, the three append-only
+   triggers). U-1 has been owner-applied to the live database and
+   verified there; a *fresh checkout* cannot run Phase 5 until this file
+   is updated by the owner. `sampark/audit/schema_proposal.sql` holds the
+   exact DDL, unmodified, as the durable record of what was applied.
+2. CI has no PostgreSQL service (U-7, approved, not yet applied — owner
+   action per Design Lock §17.3, `.github/workflows/**` is human-owned).
+   Without it, 64 tests silently skip in CI, including
+   `tests/test_concurrent_grant_issuance.py` (§12's most important test)
+   and Phase 5's own T-18/T-26 exit-criterion tests. The exact proposed
+   diff is at `CI_POSTGRES_SERVICE_PROPOSAL.md` (repo root); the workflow
+   file itself has not been touched.
+3. U-8 (registry writes -> audit events, approved) is now wired for
+   `agent.registered` (`sim/arm_b.py`'s registry setup ->
+   `sampark.audit.sink.AuditSink.record_agent_registered`, `audit_sink=None`
+   by default, byte-identical when omitted). `agent.struck`/`agent.revoked`
+   remain library-only (`sampark/audit/emit.py`'s emitter functions exist
+   and are tested) because **no code path anywhere calls
+   `sampark.registry.strikes.record_scope_denial` in production** — spec
+   §12.3's two-stage rogue-agent demo strikes on stage-two *hard-policy*
+   denials (rate ceiling / quiet hours), a mechanism that does not exist
+   in the codebase yet and is Phase 8 demo-surface territory, not a
+   Phase 0–5 gap. Do not wire a scope-denial-triggered strike into
+   `sampark/mediation/service.py` without an explicit owner decision —
+   the real spec-described trigger is a different mechanism.
+4. §18.1–§18.6 (Design Lock) and U-1…U-8 owner confirmations are not yet
+   recorded in `DECISIONS.md` — Claude must not write that file (§13);
+   the owner does.
+5. `results/*.json` (the entire Phase 4 evidence record) is gitignored —
+   durable only in this working tree. Whether to commit it conflicts with
+   the Phase 2 "generator committed, output not" convention; needs an
+   owner ruling before Phase 6 writes into the same directory.
 
 Update this section at each phase boundary.

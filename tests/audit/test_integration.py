@@ -45,6 +45,7 @@ import pytest
 from sampark.allocator.constants import IST
 from sampark.audit import chain, export, explain, store
 from sampark.audit.event_types import (
+    AGENT_REGISTERED,
     DECISION_DEFERRED,
     GRANT_RESERVED,
     REQUEST_DENIED_ON_SCOPE,
@@ -273,3 +274,98 @@ def test_real_deferred_decision_carries_real_reason_and_score(pg_conn, pg_raw_co
     # AllocationOutcome (that version already exists in
     # tests/audit/test_emit.py).
     assert "fact_unavailable.consent_scope" in deferred_events[0].payload["fact_unavailable_reason_codes"]
+
+
+@pytest.fixture()
+def _clean_canonical_agents(pg_raw_conn):
+    """`sim.arm_b._AGENTS` uses FIXED, canonical agent_ids
+    ("payment_retry", "cart_recovery", "mandate_recovery",
+    "receivables") shared with the official evidence CLI's own registry
+    setup against the SAME `public.agents` table —
+    `sampark.registry.store.PostgresAgentRepository.register()` raises
+    `AgentRegistrationConflictError` if a re-registration under a
+    different seed's deterministic key doesn't match what's already
+    there. Delete-before/delete-after around exactly these agent_ids,
+    mirroring `run_phase4_ablations.sh`'s own established cleanup
+    convention (agents/capability_scopes are treated as ephemeral,
+    per-run state, not permanent evidence), keeps this test
+    self-contained and independent of whatever seed a previous official
+    run last registered them under — and leaves the table exactly as it
+    found it."""
+    from sim.arm_b import _AGENTS
+
+    agent_ids = [a.agent_id for a in _AGENTS]
+
+    def _delete():
+        with pg_raw_conn.cursor() as cur:
+            cur.execute("DELETE FROM capability_scopes WHERE agent_id = ANY(%s)", (agent_ids,))
+            cur.execute("DELETE FROM agents WHERE agent_id = ANY(%s)", (agent_ids,))
+
+    _delete()
+    try:
+        yield agent_ids
+    finally:
+        _delete()
+
+
+def test_real_agent_registration_produces_agent_registered_events(pg_conn, pg_raw_conn, _clean_canonical_agents):
+    """U-8, registration half. `sim.arm_b._build_agent_registry_postgres`
+    — the SAME function the official evidence CLI's registry setup calls
+    at the start of every real Arm B run — is given a real
+    `PostgresAuditSink` pointed at the isolated per-test audit schema.
+    Proves: one real `agent.registered` event per registered agent, with
+    the real `agent_id` from the real `Agent` object `repo.register()`
+    was actually called with (the payload deliberately excludes
+    `publisher` — see `event_for_agent_registered`'s docstring: it is
+    free-form text, incompatible with the canonical payload's
+    ASCII-identifier rule); and that re-registering the SAME seed
+    (idempotent at the registry level, per
+    `_build_agent_registry_postgres`'s own docstring) is ALSO idempotent
+    at the audit level — no duplicate rows, via `chain.append()`'s
+    existing `AlreadyAppended` path, not new logic. This test is also
+    what caught `event_for_agent_registered` originally including
+    `publisher` in the payload: the real, multi-word publisher strings
+    `sim/arm_b.py` actually uses ("SAMPARK Arm B evidence runner")
+    raised `PayloadValidationError` the first time this function was
+    ever exercised against real production-shaped data — the pre-U-8
+    unit tests happened to use single-word publishers ("Acme") and never
+    caught it."""
+    from datetime import datetime, timezone
+
+    from sim.arm_b import _AGENTS, _build_agent_registry_postgres
+
+    sink = PostgresAuditSink(pg_conn)
+    registered_at = datetime(2025, 9, 10, 0, 0, tzinfo=timezone.utc)
+
+    _build_agent_registry_postgres(pg_raw_conn, seed=42, audit_sink=sink, registered_at=registered_at)
+
+    events = [e for e in chain.all_events_ordered(pg_conn) if e.event_type == AGENT_REGISTERED]
+    assert {e.payload["agent_id"] for e in events} == set(_clean_canonical_agents)
+    assert len(events) == len(_AGENTS)
+    assert all(e.agent_signature is None for e in events), "agent.registered has no signed request behind it"
+
+    # Idempotent re-registration (same seed) -> idempotent audit, not a second row.
+    _build_agent_registry_postgres(pg_raw_conn, seed=42, audit_sink=sink, registered_at=registered_at)
+    events_again = [e for e in chain.all_events_ordered(pg_conn) if e.event_type == AGENT_REGISTERED]
+    assert len(events_again) == len(_AGENTS)
+
+    report = chain.verify_chain(pg_conn)
+    assert report.linkage_ok and report.genesis_ok
+
+
+def test_audit_sink_none_leaves_registration_behavior_unchanged(pg_raw_conn, _clean_canonical_agents):
+    """Byte-identical-behavior guarantee, the registration half:
+    `_build_agent_registry_postgres`'s registration/idempotency behavior
+    with `audit_sink=None` (every pre-U-8 call site, including the
+    official evidence CLI) is verified unaffected by U-8's addition —
+    no audit_events write is attempted at all when no sink is given, so
+    this call cannot raise `MissingSchemaMigrationError` even against a
+    database with no isolated audit schema in scope."""
+    from datetime import datetime, timezone
+
+    from sim.arm_b import _AGENTS, _build_agent_registry_postgres
+
+    keypairs = _build_agent_registry_postgres(
+        pg_raw_conn, seed=42, audit_sink=None, registered_at=datetime(2025, 9, 10, 0, 0, tzinfo=timezone.utc),
+    )
+    assert set(keypairs) == set(_clean_canonical_agents)

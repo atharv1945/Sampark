@@ -1,7 +1,9 @@
 """The emitter — Phase 5A §1.2's "Emit" layer.
 
-STRUCTURAL RULE (enforced by tests/audit/test_structural_boundaries.py via
-AST, the same technique as tests/allocator/test_structural_boundaries.py):
+STRUCTURAL RULE (enforced by tests/audit/test_emit.py's
+test_audit_package_never_imports_policy_or_scoring_or_greedy /
+test_audit_package_never_imports_bare_policy_module via AST, the same
+technique as tests/allocator/test_structural_boundaries.py):
 this module may only COPY fields off objects Phase 4 already returned. It
 must never import `sampark.policy`, `sampark.policy.hard`,
 `sampark.allocator.scoring`, or `sampark.allocator.greedy`, and must never
@@ -15,10 +17,16 @@ Every function returns a DRAFT AuditEvent with `prev_hash =
 PENDING_PREV_HASH` — chain.append() derives the real value under the
 advisory lock (Phase 5A §7.1). Nothing here touches the database.
 
-Phase 4 integration status: NOT WIRED. sim/arm_b.py does not call any
-function in this module yet (U-2 approved, not yet applied — see the
-integration patch in the Phase 5B report). Every function is exercised
-directly by tests/audit/** against hand-built Phase 4 objects.
+Phase 4 integration status: WIRED. `sampark/mediation/service.py::
+mediate_window` and `sim/arm_b.py` both call into this module via
+`sampark.audit.sink.PostgresAuditSink` (U-2, applied) whenever an
+`audit_sink` is supplied — `None` by default, so every pre-U-2 call site
+is unaffected. `sim/arm_b.py`'s agent-registry builders
+(`_build_agent_registry_memory`/`_build_agent_registry_postgres`) also
+call `event_for_agent_registered` the same way (U-8's registration half,
+applied). Every function here remains additionally exercised directly by
+tests/audit/** against hand-built Phase 4 objects, and by
+tests/audit/test_integration.py against the real Phase 4 decision path.
 """
 
 from __future__ import annotations
@@ -287,10 +295,22 @@ def event_for_grant_expired(grant_id: uuid.UUID, request_id: uuid.UUID, at: date
 
 
 def event_for_agent_registered(agent: Agent, at: datetime) -> AuditEvent:
+    """`Agent.publisher` is a free-form display string (`CapabilityScope`/
+    `Agent` place no format constraint on it — real values in this
+    codebase include "Acme Recovery Co", "Third-Party Recovery Co", "SAMPARK
+    Arm B evidence runner"), so it is deliberately NOT copied into the
+    payload: canonical.py's `_SAFE_PAYLOAD_STRING_RE` requires every
+    payload string to be a controlled ASCII identifier (Phase 5A §4.3 rule
+    3 / §10 privacy rule — "no free-form message text"), and `publisher`
+    fails that by construction the moment it contains a space. `agent_id`
+    alone (already the identifier used by every other event type) is
+    sufficient to identify which registration this event records; the
+    registry's own `agents` table remains the source of truth for
+    `publisher` if it is ever needed."""
     return _draft(
         AGENT_REGISTERED, event_id_for(AGENT_REGISTERED, agent.agent_id), at,
         None, None,
-        {"agent_id": agent.agent_id, "publisher": agent.publisher},
+        {"agent_id": agent.agent_id},
     )
 
 

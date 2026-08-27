@@ -11,6 +11,34 @@ jobs:
     name: pytest (Python 3.11)
     runs-on: ubuntu-latest
 
+    # U-7 (Design Lock §17.3, owner-applied): a real PostgreSQL 16 service,
+    # matching docker-compose.yml's image, so the `postgres`-marked tests
+    # (including tests/test_concurrent_grant_issuance.py, the project's most
+    # important test) actually run in CI instead of silently skipping.
+    # Applied from CI_POSTGRES_SERVICE_PROPOSAL.md, which is retained as the
+    # durable record of the reviewed proposal.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sampark
+          POSTGRES_USER: sampark
+          POSTGRES_PASSWORD: sampark_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sampark -d sampark"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: sampark
+      POSTGRES_USER: sampark
+      POSTGRES_PASSWORD: sampark_ci
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,6 +57,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+
+      # sampark/schema.sql now includes the Phase 5 U-1 audit migration
+      # directly (folded in after this proposal was reviewed), so one file
+      # is sufficient — the original proposal's second `psql` invocation
+      # against sampark/audit/schema_proposal.sql is no longer needed and
+      # would now fail (ALTER TABLE ... ADD COLUMN seq a second time).
+      - name: Apply schema (sampark/schema.sql)
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-client
+          PGPASSWORD=sampark_ci psql -h localhost -U sampark -d sampark -f sampark/schema.sql
 
       - name: Run tests
         run: python -m pytest

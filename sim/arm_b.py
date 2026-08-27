@@ -196,7 +196,17 @@ def _deterministic_keypair(seed: int, agent_id: str) -> AgentKeypair:
     return AgentKeypair(signing_key=SigningKey(seed_bytes))
 
 
-def _build_agent_registry_memory(seed: int) -> tuple[InMemoryAgentRepository, dict[str, AgentKeypair]]:
+def _build_agent_registry_memory(
+    seed: int,
+    audit_sink: "AuditSink | None" = None,
+    registered_at: datetime | None = None,
+) -> tuple[InMemoryAgentRepository, dict[str, AgentKeypair]]:
+    """`audit_sink`/`registered_at` (Phase 5, U-8) — `None` by default,
+    unchanged behavior. When both are given, each agent's registration
+    is followed by one additive `audit_sink.record_agent_registered(...)`
+    call — the registration itself (`repo.register(...)`) is unchanged
+    either way. See `_run_arm_b_memory` for how `registered_at` is
+    derived (a window-boundary instant, never a wall clock)."""
     from sampark.registry.keys import generate_keypair
 
     repo = InMemoryAgentRepository()
@@ -209,10 +219,18 @@ def _build_agent_registry_memory(seed: int) -> tuple[InMemoryAgentRepository, di
             publisher="SAMPARK Phase 2 baseline", state=AgentState.ACTIVE, strike_count=0,
         )
         repo.register(registry_agent, _AGENT_SCOPES[agent.agent_id])
+        if audit_sink is not None and registered_at is not None:
+            audit_sink.record_agent_registered(registry_agent, at=registered_at)
     return repo, keypairs
 
 
-def _build_agent_registry_postgres(conn: psycopg.Connection, seed: int) -> dict[str, AgentKeypair]:
+def _build_agent_registry_postgres(
+    conn: psycopg.Connection,
+    seed: int,
+    audit_sink: "AuditSink | None" = None,
+    registered_at: datetime | None = None,
+) -> dict[str, AgentKeypair]:
+    """`audit_sink`/`registered_at` — see `_build_agent_registry_memory`."""
     repo = PostgresAgentRepository(conn)
     keypairs: dict[str, AgentKeypair] = {}
     for agent in _AGENTS:
@@ -223,6 +241,8 @@ def _build_agent_registry_postgres(conn: psycopg.Connection, seed: int) -> dict[
             publisher="SAMPARK Arm B evidence runner", state=AgentState.ACTIVE, strike_count=0,
         )
         repo.register(registry_agent, _AGENT_SCOPES[agent.agent_id])  # idempotent no-op on repeat
+        if audit_sink is not None and registered_at is not None:
+            audit_sink.record_agent_registered(registry_agent, at=registered_at)
     return keypairs
 
 
@@ -405,7 +425,10 @@ def _run_arm_b_memory(
     merchant_budget_paise_per_window: int = MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW,
     audit_sink: "AuditSink | None" = None,
 ) -> ArmBResult:
-    agent_repo, keypairs = _build_agent_registry_memory(seed)
+    registered_at = (
+        window_start_for(_window_range(all_actions)[0]) if audit_sink is not None and all_actions else None
+    )
+    agent_repo, keypairs = _build_agent_registry_memory(seed, audit_sink=audit_sink, registered_at=registered_at)
     risk_item_repo = _build_risk_item_repo(ledger)
     mediation_ledger = InMemoryMediationLedger(
         _risk_items_by_customer(ledger), merchant_budget_paise_per_window=merchant_budget_paise_per_window
@@ -484,7 +507,8 @@ def _run_arm_b_postgres(
     try:
         load_ledger(conn, ledger)  # idempotent — Phase 1's own loader, unmodified
 
-        keypairs = _build_agent_registry_postgres(conn, seed)
+        registered_at = window_start_for(window_range[0]) if audit_sink is not None else None
+        keypairs = _build_agent_registry_postgres(conn, seed, audit_sink=audit_sink, registered_at=registered_at)
         risk_item_repo = PostgresRiskItemRepository(conn)
         agent_repo = PostgresAgentRepository(conn)
         run_seed_risk_ids = frozenset(item.risk_id for item in ledger.risk_items)

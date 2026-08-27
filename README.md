@@ -4,8 +4,101 @@ A mediation layer for revenue-recovery agents. See
 `SAMPARK-razorpay-buildathon-spec.md` for the full design, `CLAUDE.md`
 for engineering discipline, and `DECISIONS.md` for the build log.
 
-This file grows one phase at a time (spec §18.0); earlier phases have
-not yet appended their sections.
+This file grows one phase at a time (spec §18.0).
+
+## Phase 0 — Foundations & Contracts
+
+Exit criterion (spec §18.1): *a test-mode payment link created from code,
+and CI passing.* Both demonstrated: `scripts/verify_razorpay_payment_link.py
+--create` produced one real Razorpay test-mode Payment Link
+(`rzp_test_` credentials only, CLAUDE.md §8) and confirmed it by fetching
+the created link back by ID; `.github/workflows/ci.yml` runs the suite on
+Python 3.11 (pinned; `tests/test_environment.py` enforces the pin at
+runtime).
+
+- `sampark/schema.sql` — the hand-authored, human-owned PostgreSQL schema
+  (CLAUDE.md §3).
+- `sampark/contracts/**` — Pydantic domain/API contracts, mirrored in
+  `CONTRACTS.md`; `tests/contracts` (73 tests).
+- `sampark/integrations/razorpay.py` — the SDK wrapper, `rzp_test_`-only,
+  SDK calls mocked in `tests/integrations` (11 tests) so CI never reaches
+  the real API.
+- `.gitignore` (secrets-first), `.env.example` (names only, no values),
+  `pyproject.toml` (config-only, no packaging tables — imports resolve via
+  the root `conftest.py` instead).
+
+## Phase 1 — Data spine
+
+Exit criterion: *20,000 risk items generated, seeded, reproducible across
+two runs.* Demonstrated by `tests/sim_generator/test_generator_volume.py`
+and `test_generator_reproducibility.py` (byte/content equality across two
+independent generations of the same seed).
+
+- `sim/generator.py`, `sim/population.py`, `sim/seeding.py` — the seeded,
+  deterministic simulator (no Python `random`); ~5,000 customers, 20,000
+  risk items, 4 canonical sources.
+- `sampark/identity/resolution.py` — canonicalize -> SHA-256 ->
+  equivalence classes, no `person_id` leakage.
+- `sampark/rootcause/{lookup.py,taxonomy.yaml}` — deterministic YAML
+  root-cause lookup, 8-value taxonomy, `unmapped -> unknown` (CLAUDE.md §7:
+  root-cause classification is explicitly not an LLM task).
+- `risk_id` is seed-scoped and non-colliding across seeds; the Postgres
+  loader (`sim/persistence.py`) surfaces a conflicting existing row as an
+  explicit error rather than masking it with `ON CONFLICT DO NOTHING` —
+  see `DECISIONS.md`'s Phase 1 entry for the incident that found this.
+- **Known, accepted limitation:** the generator emits no opt-out events
+  and no consent-scope data. `sampark/policy/hard/consent_scope.py`'s own
+  docstring documents `consent_scopes = {}` as a placeholder, routed to
+  `FACT_UNAVAILABLE` (never silently passed). This is why
+  `post_optout_contacts`/`consent_scope_violations` read `null` in every
+  Phase 4 compliance report.
+
+## Phase 2 — Arm A baseline
+
+Exit criterion: *Arm A runs end to end and emits a metrics file.*
+Demonstrated by `sim/arm_a_cli.py` producing
+`results/arm_a_metrics_{7,42,101,2024,31337}.json`; `tests/arm_a` (17
+tests) plus `tests/agents` (24 tests) plus `tests/sim_environment` (11
+tests).
+
+- `agents/{payment_retry,cart_recovery,mandate_recovery,receivables}.py`
+  — four thin, genuinely unmediated agents (zero import of
+  `sampark.registry`/`allocator`/`budget`/`policy`, mechanically enforced
+  by `tests/agents/test_hidden_response_isolation.py`).
+- `sim/environment.py` — the sole outcome authority; agents never see
+  `HiddenResponseProfile`.
+- `recovery_unit = "risk_item"` is stamped explicitly in the metrics
+  output — the recovered-amount metric is per risk item, not per unique
+  customer or unique economic payment (Phase 7 attribution will later
+  define credited recovery against a holdout).
+- Exactly-once action/outcome invariant: `tests/arm_a/test_exactly_once_invariant.py`.
+
+## Phase 3 — Agent Registry
+
+Exit criterion: *an out-of-scope request is rejected on signature-verified
+scope alone, with no allocator involvement.* Demonstrated by
+`tests/test_scope_enforcement.py` — a real Ed25519 keypair, a real
+registration, a genuinely valid signature on a request for a channel the
+agent never declared, denial via `evaluate_scope` alone, **and** two
+structural proofs: an AST parse of `sampark/registry/scope.py`'s own
+imports (nothing allocator-shaped) and a signature-parameter check on
+`evaluate_scope` itself (no allocator-shaped parameter).
+
+- `sampark/registry/{keys,store,signing,strikes,scope}.py` — Ed25519
+  keypairs, registration, capability scopes, detached signatures,
+  strikes, revocation; `tests/registry` (42 tests).
+- Registration's own check-then-insert race is a consciously **accepted**
+  limitation, recorded in `DECISIONS.md`: SERIALIZABLE semantics and the
+  concurrency test were deliberately reserved for Phase 4's grant
+  issuance, "the central correctness problem," not registration.
+- `sampark/registry/strikes.py::record_scope_denial` is a pure, tested
+  orchestration function with **no production call site**: no code path
+  in `sampark/mediation/service.py` or `sim/arm_b.py` invokes it today.
+  Spec §12.3's two-stage rogue-agent demo strikes on stage-two
+  *hard-policy* denials (rate ceiling / quiet hours) — a mechanism that
+  does not exist in this codebase yet — not on the scope-denial path
+  `record_scope_denial` covers. Flagged, not silently wired; see
+  `CLAUDE.md` §15.
 
 ## Phase 4 — Mediation core
 
@@ -16,7 +109,7 @@ scoring `expected_net` from a forward-looking fatigue term, and a
 mediated Arm B runner that reuses the unchanged Phase 2 agents and
 Phase 3 registry.
 
-**Status: implementation complete; final evidence run pending.** The
+**Status: implementation complete; five-seed evidence gate PASS.** The
 owner-authored PostgreSQL schema additions
 (`sampark/schema.sql`, tables 9–12), the `SERIALIZABLE` grant-issuance
 transaction (`sampark/budget/issuance.py`), and its 50-way concurrency
@@ -26,8 +119,9 @@ pass against real PostgreSQL. The official evidence CLI
 (`sim/arm_b_cli.py`) always runs the mediated batch against this real
 transaction — never the in-memory reference — and supports the four
 precommitted ablations (Design Lock §14.4). The five-seed evidence run
-itself (`7, 42, 101, 2024, 31337`) has not yet been executed; see "Not
-done" below.
+(`7, 42, 101, 2024, 31337`) across the headline configuration and all
+four required ablations has been executed; see "Evidence status" below
+for the result.
 
 ### What's in
 
@@ -63,8 +157,37 @@ done" below.
 
 The five-seed precommitted gate (`sim/gate.py`:
 `mean(B ₹/contact) > mean(A ₹/contact)` over seeds `7, 42, 101, 2024,
-31337`) has **not yet been run**. No result is claimed here — see "Not
-done" below for what remains before it can be.
+31337`) is **PASS**, at `constants_commit_sha
+aa87123aafdc9d812f5a01c04766c60b9198a2ce`:
+
+| | Arm A | Arm B |
+|---|---|---|
+| mean ₹/contact (paise) | 89,387.38 | 156,957.37 |
+| total contacts | 100,000 | 51,542 |
+| total recovered (paise) | 8,938,738,057 | 8,089,920,774 |
+| total incentive spend (paise) | 128,017,454 | 84,670,484 |
+
+Uplift ranges 1.7114–1.8822× across the five seeds (stdev 0.0633). Arm B's
+enforced-compliance violations are **zero** — quiet-hour, both contact
+caps, conflicting-action, and interlock-dispute — across all five seeds.
+All four required ablations (Design Lock §14.4) also PASS: `aging_zero`
+1.66–1.81×, `merchant_margin_half` 1.71–1.88×, `fifo_under_cap`
+1.06–1.14× (the FIFO ablation isolates pure chronological throttling from
+value-aware allocation — most of the headline uplift is allocation, not
+throttling).
+
+**Reported plainly, because it goes against the thesis's simplest
+telling:** Arm B recovers **0.905×** of Arm A's total ₹ (8.09B vs 8.94B
+paise) — it wins decisively on ₹/contact by contacting far fewer people,
+not by recovering more money overall. The locked gate is ₹/contact
+(Design Lock §18.6), which passes; the total-₹ comparison is reported
+here so it is not discovered later as an omission.
+
+**Evidence durability, stated plainly:** `results/*.json` (20 metrics
+files + 4 gate files backing the table above) is currently gitignored —
+durable only in the local working tree that produced it, not in git. This
+conflicts with the precommitment device's own premise (Design Lock
+§13.4) and is an open owner decision; see `CLAUDE.md` §15.
 
 ### Known gap, stated plainly
 
@@ -82,15 +205,21 @@ uplift model) where incentive genuinely affects conversion probability
 for the test that documents this instead of asserting unreachable
 behaviour.
 
-### Not done in this session
+### Out of scope for Phase 4 (Design Lock §19)
 
-- The full five-seed precommitted evidence run (`7, 42, 101, 2024,
-  31337`) across the headline configuration and the four required
-  ablations (Design Lock §14.4) — `sim/arm_b_cli.py --seed S --ablation
-  A` and `sim/gate.py` are ready; the run itself has not been executed.
-- Everything explicitly out of scope for Phase 4 (Design Lock §19):
-  the audit chain, uplift/fatigue models, holdout attribution, the LLM
-  policy compiler, the UI, and the chaos panel.
+The audit chain (Phase 5), uplift/fatigue models (Phase 6), holdout
+attribution (Phase 7), the LLM policy compiler (Phase 7), the UI (Phase
+8), and the chaos panel (Phase 8). None of these are implemented here.
+
+### CI/Postgres gap
+
+`.github/workflows/ci.yml` has no PostgreSQL service (Design Lock §17.3,
+owner-applied, not yet applied). Locally, the full suite is **542 passed,
+3 skipped** (Redis-only, legitimate) with Postgres configured; without it
+(what CI sees today), it is **481 passed, 64 skipped**, including
+`tests/test_concurrent_grant_issuance.py`. See
+`CI_POSTGRES_SERVICE_PROPOSAL.md` for the exact proposed diff — not
+applied, per the same file-ownership rule.
 
 ## Phase 5 — Audit & Explainability
 
@@ -99,14 +228,42 @@ explainability layer, and its wiring into the real Phase 4 decision
 path, per the approved Phase 5A design (session-reported) and the two
 Phase 5B passes (U-1 schema alignment, then U-2/U-3 integration).
 
-**Status: PHASE 5 COMPLETE.** U-1 (the owner-applied schema migration —
-`seq`, `UNIQUE(prev_hash)`, append-only triggers) is live on
-`public.audit_events`, verified. U-2 (real Phase 4 execution wired to
+**Status: core implemented and independently verified against real
+PostgreSQL; phase not yet formally closed — three items remain, listed
+below.** U-1 (the owner-applied schema migration — `seq`,
+`UNIQUE(prev_hash)`, append-only triggers) is live on `public.audit_events`,
+verified (`python -m sampark.audit.verify`: 560 events, `genesis_ok: True`,
+`linkage_ok: True`, `VALID: True`). U-2 (real Phase 4 execution wired to
 real audit emission) and U-3 (`AllocationOutcome.score` threaded from
 the allocator's own already-computed value, not recomputed) are both
 implemented, tested against real PostgreSQL, and demonstrated against
-the live audit store — see the Phase 5 completion report for the full
-evidence trail, exact files changed, and test output.
+the live audit store.
+
+**Not yet closed:**
+
+- **U-7 (CI/Postgres, approved).** Not applied — see the "CI/Postgres
+  gap" note under Phase 4 above; the same gap blocks nine Phase 5 tests,
+  including T-18 and T-26, from running in CI at all.
+- **U-1 in `sampark/schema.sql` (human-owned).** Live-applied and
+  verified against the running database; not yet folded into the
+  canonical schema file, so a fresh checkout cannot run Phase 5.
+- **U-8 (registry writes -> audit events, approved), partially wired.**
+  `agent.registered` is now emitted from `sim/arm_b.py`'s registry setup
+  (`_build_agent_registry_memory`/`_build_agent_registry_postgres` ->
+  `AuditSink.record_agent_registered`, `audit_sink=None` by default,
+  byte-identical to before when omitted — see
+  `tests/audit/test_integration.py`'s
+  `test_real_agent_registration_produces_agent_registered_events` and
+  `test_audit_sink_none_leaves_registration_behavior_unchanged`).
+  `agent.struck`/`agent.revoked` remain library-only: no code path
+  anywhere calls `sampark.registry.strikes.record_scope_denial` in
+  production. Spec §12.3's rogue-agent demo strikes on stage-two
+  *hard-policy* denials (rate ceiling / quiet hours) — a mechanism this
+  codebase does not implement — not on the scope-denial path
+  `record_scope_denial` covers, so wiring that specific function into
+  the live decision path would not produce the demo the spec describes.
+  Flagged for an explicit owner decision rather than silently wired; see
+  `CLAUDE.md` §15.
 
 Phase 4's decision *behavior* is unchanged: only 4 files carry any
 diff (`sampark/mediation/service.py`, `sampark/allocator/greedy.py`,
@@ -139,12 +296,13 @@ on — and remains **PASS** (mean B ₹/contact 156,957.37 vs mean A
   `tests/allocator/test_structural_boundaries.py`'s technique) from
   importing `sampark.policy`, `sampark.allocator.scoring`, or
   `sampark.allocator.greedy` — it copies, it never decides.
-- `sampark/audit/sink.py` — **new in U-2.** `AuditSink` (a structural
-  `Protocol`) and `PostgresAuditSink`, the object
-  `sampark.mediation.service.mediate_window` and `sim/arm_b.py` call
-  when given one. Owns the read-only `budget_window_id`/`claim_id`
-  lookup against `grants`/`contact_slot_claims` (`Grant` doesn't carry
-  either — CONTRACTS.md — and neither does `issue_grant`'s return value).
+- `sampark/audit/sink.py` — `AuditSink` (a structural `Protocol`) and
+  `PostgresAuditSink`, the object `sampark.mediation.service.mediate_window`
+  and `sim/arm_b.py` call when given one. Owns the read-only
+  `budget_window_id`/`claim_id` lookup against `grants`/`contact_slot_claims`
+  (`Grant` doesn't carry either — CONTRACTS.md — and neither does
+  `issue_grant`'s return value). Also carries `record_agent_registered`
+  (U-8's registration half), called from `sim/arm_b.py`'s registry setup.
 - `sampark/audit/explain.py` — `explain_request()` and
   `explain_contested_window()`: pure functions of an `AuditEvent`
   sequence, nothing else. No ledger, no database, no policy evaluator.
@@ -157,8 +315,11 @@ on — and remains **PASS** (mean B ₹/contact 156,957.37 vs mean A
   exit-criterion CLI. Run against the live store: 560 events, genesis
   correct, linkage correct, `VALID: True`.
 - `sampark/audit/export.py` — streaming canonical JSONL export.
-- `sampark/audit/schema_proposal.sql` — the U-1 migration text, now
-  applied; kept as the durable record of exactly what was applied.
+- `sampark/audit/schema_proposal.sql` — the U-1 migration text,
+  owner-applied to the live database and verified there; kept as the
+  durable record of exactly what was applied. **Not yet folded into
+  `sampark/schema.sql`** (human-owned) — a fresh checkout does not yet
+  have U-1; see `CLAUDE.md` §15.
 
 ### The U-2 integration point
 
@@ -202,18 +363,22 @@ design (never invented), not silently wrong.
 
 ### Tests
 
-`tests/audit/` — 80 tests, all passing with a live PostgreSQL
-configured (57 of those also run and pass with no Postgres — the
-pure-Python canonicalization/emitter/explain/privacy/structural
-subset). `tests/allocator/test_score_threading.py` — 4 tests, no
-database. Zero skips in `tests/audit/` as of U-2/U-3 (the prior
-session's single documented skip — the end-to-end determinism test —
-is now implemented, not skipped). Full repository suite: see the Phase
-5 completion report for the exact final count; zero failures, and every
-Phase 4 test directory (`tests/arm_a`, `tests/arm_b`, `tests/mediation`,
+`tests/audit/` — 82 tests, all passing with a live PostgreSQL configured
+(57 of those also run and pass with no Postgres — the pure-Python
+canonicalization/emitter/explain/privacy/structural subset; the two new
+U-8 registration tests live in `test_integration.py`, which is
+module-marked `postgres` throughout, so both require a live database).
+`tests/allocator/test_score_threading.py` — 4 tests, no database. Zero
+skips in `tests/audit/` when Postgres is configured. Full repository
+suite with Postgres configured: **542 passed, 3 skipped** (the 3 are
+`tests/budget/test_precheck.py`'s Redis-only tests — legitimate, `redis`
+is deliberately not a project dependency). Without Postgres configured
+(what CI currently sees — see "CI/Postgres gap" above): **481 passed, 64
+skipped**, all `postgres`-marked, none hidden. Every Phase 4 test
+directory (`tests/arm_a`, `tests/arm_b`, `tests/mediation`,
 `tests/allocator`, `tests/policy`, `tests/budget`, `tests/registry`,
-`tests/test_concurrent_grant_issuance.py`) is confirmed to have
-actually run, not merely "passed" in aggregate.
+`tests/test_concurrent_grant_issuance.py`) is confirmed to have actually
+run, not merely "passed" in aggregate.
 
 `public.audit_events` carries 560 permanent rows as of this phase (558
 pre-existing test-fixture rows from before schema isolation existed,

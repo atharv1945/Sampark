@@ -5,10 +5,14 @@
 -- Application-level contract types (UUID keys, request/grant field shapes):
 -- CONTRACTS.md. Phase 4 additions (tables 9-12, grants.budget_window_id):
 -- the approved Phase 4 Design Lock §1 / PHASE4_SCHEMA_AND_ISSUANCE_PROPOSAL.md §A.
+-- Phase 5 addition (audit_events.seq + append-only enforcement): U-1,
+-- owner-applied; DDL originally proposed in sampark/audit/schema_proposal.sql,
+-- which is retained unmodified as the durable record of what was applied.
 --
 -- Scope: agents, capability_scopes, customers, contact_states, risk_items,
 -- grant_requests, grants, audit_events (Phase 0); merchants, budget_windows,
--- customer_margin_windows, contact_slot_claims (Phase 4).
+-- customer_margin_windows, contact_slot_claims (Phase 4); audit_events.seq +
+-- append-only triggers (Phase 5, U-1).
 --
 -- Hand-written. Not to be regenerated or redesigned without approval.
 -- ---------------------------------------------------------------------------
@@ -315,6 +319,56 @@ CREATE UNIQUE INDEX contact_slot_claims_active_uniq
 ALTER TABLE grants
     ADD COLUMN budget_window_id UUID NOT NULL
         REFERENCES budget_windows (budget_window_id) ON DELETE RESTRICT;
+
+
+-- =============================================================================
+-- 8 (extended). AUDIT_EVENTS append-only enforcement  (Phase 5 — U-1,
+--     owner-applied; DDL originally proposed in
+--     sampark/audit/schema_proposal.sql, which is retained unmodified as the
+--     durable record of exactly what this section folds in).
+--
+--     Adds one column and enforces three invariants PostgreSQL can hold
+--     structurally rather than by application convention:
+--
+--       1. seq       — an independent, indexed total order, separate from
+--                       (and NOT part of) the hash chain itself. This is a
+--                       PERSISTENCE-ORDERING concern only — sampark/audit/
+--                       canonical.py's hash preimage deliberately excludes
+--                       it, the same class as the surrogate UUID keys this
+--                       file adds elsewhere. Two events with identical
+--                       logical content hash identically regardless of seq.
+--       2. UNIQUE(prev_hash) — the structural fork guard: two events can
+--                       never claim the same predecessor; also pins exactly
+--                       one genesis row per database.
+--       3. append-only triggers — UPDATE/DELETE/TRUNCATE on audit_events
+--                       raise, regardless of which role issues them (a
+--                       BEFORE trigger fires even for a superuser — a
+--                       column-privilege REVOKE alone would not).
+--
+--     What this does NOT close: a superuser can still DROP TRIGGER / DROP
+--     INDEX / DROP TABLE. Database-enforced append-only is tamper-EVIDENT
+--     against application bugs and ordinary roles, not tamper-PROOF against
+--     a DBA with superuser access.
+-- =============================================================================
+
+ALTER TABLE audit_events ADD COLUMN seq BIGSERIAL NOT NULL;
+CREATE UNIQUE INDEX audit_events_seq_uniq ON audit_events (seq);
+CREATE UNIQUE INDEX audit_events_prev_hash_uniq ON audit_events (prev_hash);
+
+CREATE OR REPLACE FUNCTION sampark_audit_immutable() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'audit_events is append-only (attempted %)', TG_OP
+        USING ERRCODE = 'raise_exception';
+END;
+$$;
+
+CREATE TRIGGER audit_events_no_update BEFORE UPDATE ON audit_events
+    FOR EACH ROW EXECUTE FUNCTION sampark_audit_immutable();
+CREATE TRIGGER audit_events_no_delete BEFORE DELETE ON audit_events
+    FOR EACH ROW EXECUTE FUNCTION sampark_audit_immutable();
+CREATE TRIGGER audit_events_no_truncate BEFORE TRUNCATE ON audit_events
+    FOR EACH STATEMENT EXECUTE FUNCTION sampark_audit_immutable();
 
 
 -- =============================================================================

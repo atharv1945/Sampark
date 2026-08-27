@@ -44,7 +44,7 @@ import psycopg
 
 from sampark.allocator.outcomes import AllocationOutcome, OutcomeKind
 from sampark.audit import chain, emit
-from sampark.contracts import Grant, GrantDecision, GrantRequest
+from sampark.contracts import Agent, Grant, GrantDecision, GrantRequest
 
 
 class AuditSink(Protocol):
@@ -73,6 +73,8 @@ class AuditSink(Protocol):
     def record_grant_rolled_back(self, grant: Grant, request: GrantRequest, at: datetime) -> None: ...
 
     def record_grant_expired(self, grant_id: uuid.UUID, request_id: uuid.UUID, at: datetime) -> None: ...
+
+    def record_agent_registered(self, agent: Agent, at: datetime) -> None: ...
 
 
 class MissingClaimError(RuntimeError):
@@ -127,6 +129,9 @@ class PostgresAuditSink:
 
     def record_grant_expired(self, grant_id: uuid.UUID, request_id: uuid.UUID, at: datetime) -> None:
         chain.append(self._conn, emit.event_for_grant_expired(grant_id, request_id, at))
+
+    def record_agent_registered(self, agent: Agent, at: datetime) -> None:
+        chain.append(self._conn, emit.event_for_agent_registered(agent, at))
 
     def _lookup_grant_metadata(self, grant_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
         with self._conn.cursor() as cur:
