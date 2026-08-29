@@ -60,6 +60,7 @@ from sampark.registry.scope import evaluate_scope
 from sampark.registry.store import AgentRepository, RiskItemRepository
 
 if TYPE_CHECKING:
+    from sampark.allocator.scorer import Scorer
     from sampark.audit.sink import AuditSink
 
 NS_DECISION = uuid.UUID("2a9c9e2e-7a0a-4b7a-9a4a-8b6f0b6b3a55")
@@ -129,6 +130,8 @@ def mediate_window(
     *,
     run_seed_risk_ids: frozenset[str] | None = None,
     audit_sink: "AuditSink | None" = None,
+    scorer: "Scorer | None" = None,
+    outcome_observer: "Callable[[tuple[AllocationOutcome, ...], datetime], None] | None" = None,
 ) -> MediationWindowResult:
     """`new_requests` are (request, proposed_send_after) pairs arriving
     fresh this window — each is scope-checked here, for the first and
@@ -159,7 +162,11 @@ def mediate_window(
     the existing `outcomes` loop, once per `AllocationOutcome`. Nothing
     about WHICH candidates are admitted, how they are ranked, or what
     they are granted changes — `audit_sink` is called with outcomes
-    already fully decided by the code above it."""
+    already fully decided by the code above it.
+
+    `scorer` (Phase 6) — threaded straight through to `filter_and_allocate` -> `allocate_window`; `None` preserves byte-identical Phase 4 behavior.
+
+    `outcome_observer` (Phase 6) — read-only instrumentation, not a decision hook: called ONCE per window, after `outcomes` is already fully computed below, with the complete `(outcomes, decision_at)` pair — the exact same outcomes this function's own loop then converts into `GrantDecision`s. `None` by default; every branch that reads it is skipped entirely, so this is a no-op for every existing caller. Used by `sim.optimality_gap` to compare the allocator's actual per-window choice against an independently computed exact optimum — it has no path back into `mediate_window` and cannot influence any decision."""
     decisions: list[GrantDecision] = []
     candidates: list[Candidate] = list(carried_forward)
 
@@ -183,8 +190,10 @@ def mediate_window(
 
     outcomes = filter_and_allocate(
         tuple(candidates), ledger, issuer, decision_at, aging_bonus_paise, conn=conn, fifo_mode=fifo_mode,
-        run_seed_risk_ids=run_seed_risk_ids,
+        run_seed_risk_ids=run_seed_risk_ids, scorer=scorer,
     )
+    if outcome_observer is not None:
+        outcome_observer(outcomes, decision_at)
 
     rescheduled: list[Candidate] = []
     effective_bps_by_request_id: dict[uuid.UUID, int] = {}

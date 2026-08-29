@@ -97,6 +97,7 @@ from sim.ledger import Ledger
 from sim.persistence import PostgresConfig, load_ledger
 
 if TYPE_CHECKING:
+    from sampark.allocator.scorer import Scorer
     from sampark.audit.sink import AuditSink
 
 _AGENTS: tuple[RecoveryAgent, ...] = (
@@ -311,6 +312,8 @@ def _run_window_loop(
     conn_for_issuance: object,
     run_seed_risk_ids: frozenset[str],
     audit_sink: "AuditSink | None" = None,
+    scorer: "Scorer | None" = None,
+    outcome_observer=None,
 ) -> tuple[tuple[ContactOutcome, ...], tuple[GrantDecision, ...]]:
     """The mediation algorithm itself — IDENTICAL for both backends. Every
     parameter here is already backend-specific data (a repository, a
@@ -365,6 +368,7 @@ def _run_window_loop(
             tuple(new_requests), carried_forward, agent_repo, risk_item_repo, mediation_ledger, issuer,
             decision_at, aging_bonus_paise, conn=conn_for_issuance, fifo_mode=fifo_mode,
             run_seed_risk_ids=run_seed_risk_ids, audit_sink=audit_sink,
+            scorer=scorer, outcome_observer=outcome_observer,
         )
         all_decisions.extend(result.decisions)
 
@@ -424,6 +428,8 @@ def _run_arm_b_memory(
     all_actions: list[ContactAction], aging_bonus_paise: int, fifo_mode: bool,
     merchant_budget_paise_per_window: int = MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW,
     audit_sink: "AuditSink | None" = None,
+    scorer: "Scorer | None" = None,
+    outcome_observer=None,
 ) -> ArmBResult:
     registered_at = (
         window_start_for(_window_range(all_actions)[0]) if audit_sink is not None and all_actions else None
@@ -442,6 +448,7 @@ def _run_arm_b_memory(
         risk_items_by_id, aging_bonus_paise, fifo_mode,
         lifecycle_adapter=_MemoryLifecycleAdapter(mediation_ledger), conn_for_issuance=None,
         run_seed_risk_ids=run_seed_risk_ids, audit_sink=audit_sink,
+        scorer=scorer, outcome_observer=outcome_observer,
     )
     return ArmBResult(outcomes=outcomes, decisions=decisions, backend=BACKEND_MEMORY)
 
@@ -496,6 +503,8 @@ def _run_arm_b_postgres(
     all_actions: list[ContactAction], aging_bonus_paise: int, fifo_mode: bool,
     merchant_budget_paise_per_window: int,
     audit_sink: "AuditSink | None" = None,
+    scorer: "Scorer | None" = None,
+    outcome_observer=None,
 ) -> ArmBResult:
     config = PostgresConfig.from_env()  # raises PostgresConfigError if unset — never caught here
     conn = psycopg.connect(config.conninfo())  # raises psycopg.OperationalError if unreachable — never caught here
@@ -529,6 +538,7 @@ def _run_arm_b_postgres(
             risk_items_by_id, aging_bonus_paise, fifo_mode,
             lifecycle_adapter=_PostgresLifecycleAdapter(conn), conn_for_issuance=conn,
             run_seed_risk_ids=run_seed_risk_ids, audit_sink=audit_sink,
+            scorer=scorer, outcome_observer=outcome_observer,
         )
         return ArmBResult(outcomes=outcomes, decisions=decisions, backend=BACKEND_POSTGRES)
     finally:
@@ -543,6 +553,8 @@ def run_arm_b(
     merchant_budget_paise_per_window: int = MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW,
     fifo_mode: bool = False,
     audit_sink: "AuditSink | None" = None,
+    scorer: "Scorer | None" = None,
+    outcome_observer=None,
 ) -> ArmBResult:
     """`backend` defaults to "memory" — EVERY existing call site and unit
     test that calls `run_arm_b(seed)` is unaffected by Blocker 1's
@@ -557,7 +569,14 @@ def run_arm_b(
     connection/search_path it wants the resulting events durable in) —
     this function does not construct one itself, so it makes no decision
     about WHERE audit events go, only whether to call the sink it was
-    given."""
+    given.
+
+    `scorer` (Phase 6) — `None` preserves byte-identical Phase 4 behavior (a `sampark.allocator.scorer.HeuristicScorer` is constructed internally). Pass e.g. `sampark.models.scorer.ModelBackedScorer` to rank candidates with a trained model instead.
+
+    `outcome_observer` (Phase 6) — read-only per-window instrumentation
+    hook, threaded straight through to
+    `sampark.mediation.service.mediate_window`; see that function's
+    docstring. `None` by default, zero effect on any existing caller."""
     if backend not in _VALID_BACKENDS:
         raise ValueError(f"backend must be one of {_VALID_BACKENDS}, got {backend!r}")
 
@@ -573,8 +592,10 @@ def run_arm_b(
         return _run_arm_b_memory(
             seed, ledger, view, environment, all_actions, aging_bonus_paise, fifo_mode,
             merchant_budget_paise_per_window, audit_sink=audit_sink,
+            scorer=scorer, outcome_observer=outcome_observer,
         )
     return _run_arm_b_postgres(
         seed, ledger, view, environment, all_actions, aging_bonus_paise, fifo_mode, merchant_budget_paise_per_window,
         audit_sink=audit_sink,
+        scorer=scorer, outcome_observer=outcome_observer,
     )

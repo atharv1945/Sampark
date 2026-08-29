@@ -4,6 +4,8 @@
     python -m sim.arm_b_cli --seed 42 --ablation aging_zero
     python -m sim.arm_b_cli --seed 42 --ablation merchant_margin_half
     python -m sim.arm_b_cli --seed 42 --ablation fifo_under_cap
+    python -m sim.arm_b_cli --seed 42 --ablation phase6_heuristic
+    python -m sim.arm_b_cli --seed 42 --ablation phase6_model
 
 This is the OFFICIAL evidence runner (Phase 4C-2, Blocker 1). It ALWAYS
 runs against the real, owner-authored PostgreSQL SERIALIZABLE issuance
@@ -32,6 +34,26 @@ a free-form override, so no new tuning knob exists:
                               fully enforced) from the value-AWARE allocator
                               it is being compared against — not "headline
                               ranking with a different sort key"
+    phase6_heuristic        — Phase 6's model-agnostic scorer INTERFACE
+                              (sampark.allocator.scorer), explicitly
+                              constructed as HeuristicScorer — same frozen
+                              formula as headline, routed through the new
+                              seam instead of called directly. This is the
+                              regression proof AND the required "paired
+                              heuristic ablation" (Phase 6 contract) in one
+                              artifact: it must reproduce headline exactly.
+    phase6_model            — sampark.models.scorer.build_scorer(), i.e.
+                              whatever model artifact is actually committed
+                              (sampark/models/artifact_data.py). On THIS
+                              dataset both the uplift and fatigue-hazard
+                              models report available=False (see
+                              sampark/models/uplift.py, fatigue_hazard.py),
+                              so build_scorer() deterministically falls
+                              back to the same HeuristicScorer as
+                              phase6_heuristic — this ablation is expected
+                              to reproduce headline too, and that is the
+                              honest Phase 6 result on this dataset, not a
+                              bug in the ablation.
 
 `constants_commit_sha` records `git rev-parse HEAD` at run time — the
 precommitment device (Design Lock §13.4) that lets a reader verify with
@@ -50,6 +72,7 @@ import sys
 from pathlib import Path
 
 from sampark.allocator.constants import AGING_BONUS_PAISE, MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW
+from sampark.allocator.scorer import HeuristicScorer
 from sim.arm_b import BACKEND_POSTGRES, run_arm_b
 from sim.cli import build_dataset
 from sim.mediation_metrics import build_contact_records, compute_compliance_metrics, scope_violation_count
@@ -63,7 +86,9 @@ HEADLINE = "headline"
 AGING_ZERO = "aging_zero"
 MERCHANT_MARGIN_HALF = "merchant_margin_half"
 FIFO_UNDER_CAP = "fifo_under_cap"
-ABLATIONS = (HEADLINE, AGING_ZERO, MERCHANT_MARGIN_HALF, FIFO_UNDER_CAP)
+PHASE6_HEURISTIC = "phase6_heuristic"
+PHASE6_MODEL = "phase6_model"
+ABLATIONS = (HEADLINE, AGING_ZERO, MERCHANT_MARGIN_HALF, FIFO_UNDER_CAP, PHASE6_HEURISTIC, PHASE6_MODEL)
 
 # W8: a short, self-contained note stamped into EVERY result file under
 # "ablation_note" — a reader of just the JSON (not this module's
@@ -79,13 +104,28 @@ _ABLATION_NOTES: dict[str, str] = {
         "entirely (deliberate — Design Lock §14.4): isolates pure chronological throttling "
         "(hard caps, still fully enforced) from value-aware allocation."
     ),
+    PHASE6_HEURISTIC: (
+        "Phase 6 scorer interface (sampark.allocator.scorer), explicitly constructed as "
+        "HeuristicScorer -- the same frozen formula as headline, routed through the new "
+        "model-agnostic seam. Must reproduce headline exactly; this IS the regression proof."
+    ),
+    PHASE6_MODEL: (
+        "sampark.models.scorer.build_scorer() against the committed model artifact "
+        "(sampark/models/artifact_data.py). Both uplift and fatigue-hazard models report "
+        "available=False on this dataset (no treatment/control split; no opt-out labels -- "
+        "see sampark/models/uplift.py, fatigue_hazard.py), so this deterministically falls "
+        "back to HeuristicScorer and reproduces headline too. That is the honest Phase 6 "
+        "result on this dataset, not a bug in the ablation."
+    ),
 }
 
 
 def _ablation_params(ablation: str) -> dict:
     """Deterministic mapping, ablation label -> the ONE parameter it
     changes. Every other parameter stays at its frozen default —
-    Design Lock §14.4: "identical code" across all four conditions."""
+    Design Lock §14.4: "identical code" across all four Phase 4
+    conditions; the two Phase 6 additions below change only WHICH
+    Scorer computes expected_net, never aging/margin/fifo."""
     if ablation == HEADLINE:
         return {}
     if ablation == AGING_ZERO:
@@ -94,6 +134,12 @@ def _ablation_params(ablation: str) -> dict:
         return {"merchant_budget_paise_per_window": MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW // 2}
     if ablation == FIFO_UNDER_CAP:
         return {"fifo_mode": True}
+    if ablation == PHASE6_HEURISTIC:
+        return {"scorer": HeuristicScorer()}
+    if ablation == PHASE6_MODEL:
+        from sampark.models.scorer import build_scorer  # local: only Phase 6 ablations need sklearn
+
+        return {"scorer": build_scorer()}
     raise ValueError(f"unknown ablation: {ablation!r}")  # unreachable — argparse choices= guards this
 
 
@@ -149,11 +195,13 @@ def main() -> None:
     aging_bonus = params.get("aging_bonus_paise", AGING_BONUS_PAISE)
     merchant_budget = params.get("merchant_budget_paise_per_window", MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW)
     fifo_mode = params.get("fifo_mode", False)
+    scorer = params.get("scorer")  # None for every Phase 4 ablation -- byte-identical default
 
     print("=" * 70)
     print(f"SAMPARK Arm B OFFICIAL evidence run — backend={BACKEND_POSTGRES.upper()}")
     print(f"seed={args.seed}  ablation={args.ablation}")
     print(f"aging_bonus_paise={aging_bonus}  merchant_budget_paise_per_window={merchant_budget}  fifo_mode={fifo_mode}")
+    print(f"scorer={type(scorer).__name__ if scorer is not None else 'default (HeuristicScorer)'}")
     print(f"ablation_note: {_ABLATION_NOTES[args.ablation]}")
     print("=" * 70)
 
@@ -164,6 +212,7 @@ def main() -> None:
             backend=BACKEND_POSTGRES,
             merchant_budget_paise_per_window=merchant_budget,
             fifo_mode=fifo_mode,
+            scorer=scorer,
         )
     except PostgresConfigError as exc:
         print(f"FATAL: Postgres is not configured — {exc}", file=sys.stderr)
@@ -187,6 +236,7 @@ def main() -> None:
         "aging_bonus_paise": aging_bonus,
         "merchant_budget_paise_per_window": merchant_budget,
         "fifo_mode": fifo_mode,
+        "scorer": type(scorer).__name__ if scorer is not None else "HeuristicScorer",
         "constants_commit_sha": commit_sha,
         "ablation_note": _ABLATION_NOTES[args.ablation],
         "compliance": compliance,

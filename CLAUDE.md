@@ -366,21 +366,91 @@ one and present it as settled.
 
 ## 15. Current phase
 
-**Phases 0–5 implemented; closing pass in progress before Phase 6.**
+**Phases 0–6 implemented. Phase 6 (Intelligence layer) is CLOSED as of this
+entry. Do not begin Phase 7 work until the owner reviews this closure.**
 
 Phases 0 through 5 have each demonstrated their spec §18.1 exit criterion
 (payment link + CI; 20k reproducible risk items; Arm A end-to-end metrics;
 scope-only rejection with no allocator involvement; the Phase 4 hard gate
 PASS; and Phase 5's chain/explainability verified live against real
-PostgreSQL). Do not begin Phase 6 work until the items below are closed.
+PostgreSQL).
 
-**Phase 4 evidence (protected — do not alter without an explicit,
-recorded reason):** `constants_commit_sha aa87123aafdc9d812f5a01c04766c60b9198a2ce`;
-mean A ₹/contact 89,387.38 paise; mean B ₹/contact 156,957.37 paise;
-uplift 1.7114–1.8822× across seeds 7, 42, 101, 2024, 31337; all four
-required ablations PASS; Arm B enforced-compliance violations zero
-throughout. Independently reproduced read-only from the already-committed
-`results/*.json` files as part of this closure work — not rerun.
+**Phase 6 exit criterion (spec §18.1): "Models beat the heuristic — or are
+honestly reported as not doing so, with the ablation committed." Result:
+the honest-non-improvement branch — demonstrated, not the models-win branch.**
+
+**Phase 6 evidence (recorded — do not alter without an explicit, recorded
+reason):**
+- `sampark/allocator/scorer.py` — model-agnostic scorer seam. `constants_commit_sha`
+  in every Phase 6 result file is `78f5850c24969bfbbf0afde2b88fc9a8e3a4dcfc` (HEAD at
+  run time); `sampark/allocator/constants.py` is byte-identical between the protected
+  Phase 4 commit `aa87123` and HEAD (`git diff aa87123 HEAD -- sampark/allocator/constants.py`
+  is empty), so the comparison below is against unchanged constants.
+- `phase6_heuristic` ablation reproduces the Phase 4 headline **exactly** (bit-for-bit
+  on `total_contacts`, `total_recoveries`, `recovered_amount_paise`,
+  `recovered_amount_per_contact_paise`, `incentive_spend_paise`, `decisions_logged`)
+  across all five precommitted seeds 7, 42, 101, 2024, 31337 — this is the regression
+  proof for the new scorer seam.
+- `sampark/models/uplift.py` (T-learner) and `fatigue_hazard.py`: implemented, but both
+  report `available=False` on this dataset, identically (byte-identical reason string)
+  across all five seeds:
+  - uplift: no untreated/control population exists for any risk source — every eligible
+    RiskItem is contacted by its matching Phase 2 agent exactly once (max uncontacted
+    fraction observed: 0.0000); a T-learner needs real treated/control variation, which
+    requires a holdout arm that does not exist until Phase 7 (spec §8.9).
+  - fatigue hazard: `agents.types.ContactOutcome` has no opt-out-related field, and
+    `sampark.contracts.ContactState.optouts_by_channel` exists on the contract but
+    `sim/ledger.py` constructs every `ContactState` with `optouts_by_channel={}` and no
+    generator code ever writes to it — no real opt-out signal exists yet.
+  - `phase6_model` therefore deterministically falls back to `HeuristicScorer` and also
+    reproduces the Phase 4 headline exactly, for the same honest reason, on all five seeds.
+  - No unsupported ML improvement is claimed anywhere in this evidence.
+- `sim/optimality_gap.py` — exact per-window multiple-choice-knapsack DP (no CP-SAT;
+  CLAUDE.md §2), tested against brute force (`tests/sim_optimality_gap/`, 8/8 passing).
+  Measured (seed 42, top-5 windows by admitted ceiling): mean gap ratio ≈0.9996 /
+  worst-case ≈0.9994 at headline merchant-margin capacity
+  (`results/phase6_optimality_gap_headline_seed42.json`); mean ≈0.9994 / worst-case
+  ≈0.9985 at half that capacity, an artificial stress test since headline capacity
+  rarely binds (`results/phase6_optimality_gap_merchant_margin_half_seed42.json`).
+  I.e. the shipped greedy allocator is empirically within ~0.05–0.15% of the measured
+  per-window optimum on this data — a lower bound on the true achievable optimum, since
+  the DP does not itself explore incentive downgrades (module docstring for the exact
+  caveats: per-window not whole-horizon, no downgrade search inside the DP).
+- Full regression suite: 588 passed, 3 skipped (skips are `tests/budget/test_precheck.py`
+  — redis not pip-installed as a project dependency, pre-existing and unrelated to
+  Phase 6). `python -m sampark.audit.verify` re-run after all Phase 6 evidence
+  collection: `VALID: True`, 560 events, `genesis_ok: True`, `linkage_ok: True` — the
+  audit chain was not disturbed by Phase 6 work.
+- Nothing from this phase is git-committed (§9); `git status` still shows the same
+  modified/untracked fileset the Phase 6 work produced.
+
+**Phase 6 failure-recovery incident (for the owner's `DECISIONS.md`, not written here
+per §13):** mid-evidence-run, the host C: drive filled to 100% free space, which crashed
+Docker Desktop and severed the live Postgres connection the run was using.
+`sim/arm_b.py`'s `_run_arm_b_postgres` resets its own transactional rows
+(`grant_requests`, `grants`, `contact_slot_claims`, `customer_margin_windows`,
+`budget_windows`) in a `finally` block on every run, but that block needs a live
+connection — it could not run when the connection was already dead, leaving 399
+orphaned rows. The next rerun's registry cleanup (`run_phase6_evidence.sh`, which only
+cleared `agents`/`capability_scopes`) then failed on an FK constraint
+(`grant_requests_agent_id_fkey`) because of those orphans. Detected by inspecting the
+FK error and cross-referencing it against `_cleanup_postgres_run`'s own documented-safe
+table list; fixed by extending the script's `cleanup_registry` to also clear those same
+tables/columns, matching the scope that function already documents as safe (never
+customers, risk_items, or agent identity). Two further false starts on the same rerun,
+both self-inflicted: forgetting to activate `.venv` (system Python 3.14 resolved instead
+of the project's 3.11 — the exact failure mode `tests/test_environment.py` documents),
+and a fresh background shell not having `.env`'s Postgres vars loaded.
+
+**Phase 6 residue check (post-evidence-run, before this closure entry):** all
+Phase-6-relevant transactional tables (`grant_requests`, `grants`, `contact_slot_claims`,
+`customer_margin_windows`, `agents`, `capability_scopes`) at 0 rows; one unrelated
+`budget_windows` row (`window_id 2099-01-01`, `merchant-sim`, zero reserved/spent) found —
+an inert test-fixture artifact from the general test suite, not from any Phase 6 evidence
+run (Phase 6 runs use Sept 2025 windows), left untouched since there is no established
+cleanup procedure that targets it and deleting it was not required to correct anything.
+No new Postgres schemas found (`\dn` shows only `public`). `customers`/`risk_items`
+identity tables unchanged in row count by this work.
 
 **Phase 5 core (audit chain, canonicalization, append-only enforcement,
 emitter, explainability, export, U-1 live-applied, U-2 real integration,
@@ -388,7 +458,9 @@ U-3 score threading, T-26 determinism) is implemented and independently
 verified against real PostgreSQL** — `python -m sampark.audit.verify`
 reports `VALID: True` against the live store.
 
-**Still open before Phase 6, in order of what blocks the most:**
+**Still open, pre-existing and independent of Phase 6 (carried forward, in order of
+what blocks the most — Phase 6 proceeded without these being closed; a Phase 7 session
+should still weigh them):**
 
 1. `sampark/schema.sql` (human-owned — CLAUDE.md §3 item 1) does not yet
    contain U-1's DDL (`seq`, `UNIQUE(prev_hash)`, the three append-only

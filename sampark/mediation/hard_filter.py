@@ -54,11 +54,16 @@ import collections
 
 from datetime import datetime
 
+from typing import TYPE_CHECKING
+
 from sampark.allocator.candidate import Candidate
 from sampark.allocator.greedy import allocate_window
 from sampark.allocator.outcomes import AllocationOutcome, OutcomeKind, deferred_or_denied
 from sampark.policy import hard as hard_policy
 from sampark.policy.types import MediationLedgerView, PolicyContext, Verdict
+
+if TYPE_CHECKING:
+    from sampark.allocator.scorer import Scorer
 
 
 def filter_candidates(
@@ -126,6 +131,7 @@ def filter_and_allocate(
     fifo_mode: bool = False,
     *,
     run_seed_risk_ids: frozenset[str] | None = None,
+    scorer: "Scorer | None" = None,
 ) -> tuple[AllocationOutcome, ...]:
     """The full Design Lock §5.1/§8 pipeline in one call: hard policy
     evaluation -> admissible candidate set -> allocator. This is what
@@ -137,10 +143,13 @@ def filter_and_allocate(
 
     `run_seed_risk_ids` — Phase 4C hardening, W5. Threaded straight
     through to `allocate_window` -> `issuer.issue_grant`; see that
-    function's docstring for the `None`-default rationale."""
+    function's docstring for the `None`-default rationale.
+
+    `scorer` (Phase 6) — threaded straight through to `allocate_window`; `None` preserves byte-identical Phase 4 behavior (see that function's own docstring)."""
     survivors, immediate_outcomes, fact_unavailable_by_risk_id = filter_candidates(candidates, ledger, decision_at)
     allocator_outcomes = allocate_window(
         survivors, ledger, issuer, decision_at, aging_bonus_paise, conn=conn, fifo_mode=fifo_mode,
         run_seed_risk_ids=run_seed_risk_ids, fact_unavailable_by_risk_id=fact_unavailable_by_risk_id,
+        scorer=scorer,
     )
     return immediate_outcomes + allocator_outcomes

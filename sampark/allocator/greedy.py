@@ -41,6 +41,7 @@ from sampark.allocator.reason_codes import (
     MERCHANT_MARGIN_EXHAUSTED,
     NEGATIVE_EXPECTED_NET,
 )
+from sampark.allocator.scorer import Scorer, default_scorer
 from sampark.budget.margin import downgrade_to_fit
 from sampark.budget.store import BudgetDenial, GrantIssued, GrantIssuer, InMemoryMediationLedger
 from sampark.budget.windows import next_window_start
@@ -99,6 +100,7 @@ def allocate_window(
     *,
     run_seed_risk_ids: frozenset[str] | None = None,
     fact_unavailable_by_risk_id: Mapping[str, tuple[str, ...]] | None = None,
+    scorer: Scorer | None = None,
 ) -> tuple[AllocationOutcome, ...]:
     """`candidates` must already be hard-ADMISSIBLE — this function does
     not hard-filter (see module docstring). Callers that need the full
@@ -139,11 +141,24 @@ def allocate_window(
     `priority`/`_tie_break_key`. Margin downgrade-viability and issuance
     fallback are UNCHANGED — only which candidates are admitted and how
     they are ranked differs. See `_fifo_key`'s docstring for why this is
-    a deliberate, documented departure from the headline admission rule."""
+    a deliberate, documented departure from the headline admission rule.
+
+    `scorer` (Phase 6) -- the model-agnostic scoring seam (Design Lock,
+    section 14 Round 2: "the allocator is model-agnostic behind an
+    interface"). `None` (every pre-Phase-6 call site) constructs a
+    `sampark.allocator.scorer.HeuristicScorer`, whose `.score()` calls
+    `sampark.allocator.scoring.score` exactly as this module always did
+    -- behavior is BYTE-IDENTICAL to before this parameter existed. Only
+    a caller that explicitly passes a different `Scorer` (e.g.
+    `sampark.models.scorer.ModelBackedScorer`) changes what is
+    computed; this module never constructs one itself beyond the
+    default."""
     if conn is None:
         conn = ledger
     if fact_unavailable_by_risk_id is None:
         fact_unavailable_by_risk_id = {}
+    if scorer is None:
+        scorer = default_scorer()
 
     by_customer: dict[str, list[Candidate]] = collections.defaultdict(list)
     for candidate in candidates:
@@ -169,7 +184,7 @@ def allocate_window(
             other_open = ledger.open_candidates_for_customer(
                 customer_id, decision_at, exclude_risk_id=candidate.risk_item.risk_id
             )
-            score_breakdown = scoring.score(
+            score_breakdown = scorer.score(
                 candidate,
                 candidate.request.requested_max_incentive_bps,
                 n,
@@ -233,7 +248,7 @@ def allocate_window(
                 other_open = ledger.open_candidates_for_customer(
                     customer_id, decision_at, exclude_risk_id=candidate.risk_item.risk_id
                 )
-                downgraded_score = scoring.score(
+                downgraded_score = scorer.score(
                     candidate, effective_bps, n, tuple(item.amount_paise for item in other_open)
                 )
                 current_score = downgraded_score

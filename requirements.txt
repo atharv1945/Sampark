@@ -20,8 +20,17 @@
 # generation and detached-signature verification (sampark/registry/keys.py,
 # signing.py) — chosen over `cryptography` as the smaller, purpose-built
 # dependency (bundled libsodium wheels, no OpenSSL/X.509 stack this
-# project has no other use for). FastAPI, redis, structlog, LightGBM and
-# scikit-learn still arrive in the phase that first uses them, not before.
+# project has no other use for). FastAPI, redis, structlog still arrive in
+# the phase that first uses them, not before.
+#
+# Phase 6 scope (intelligence layer, spec §7/§18.1): scikit-learn, for
+# `sklearn.isotonic.IsotonicRegression` (sampark/models/calibration.py) —
+# the ONE calibration method the spec names. No LightGBM: every Phase 6
+# model this repository actually fits is a tabular lookup-table model
+# (sampark/models/uplift.py, fatigue_hazard.py), matching
+# sampark/allocator/calibrated.py's existing precedent; a gradient-boosting
+# dependency with nothing in the repo that trains one would be exactly the
+# "unnecessary dependency" CLAUDE.md §6 warns against.
 #
 # Pins are exact for reproducibility, verified against `pip freeze` after
 # the first real install into .venv (Python 3.11.9).
@@ -35,3 +44,4 @@ pandas==3.0.5
 pyyaml==6.0.3
 psycopg[binary]==3.3.4
 pynacl==1.5.0
+scikit-learn==1.7.2

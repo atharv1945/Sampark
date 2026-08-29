@@ -54,6 +54,13 @@ _ABLATION_TO_ARM_B_FILENAME = {
     "aging_zero": "arm_b_aging_zero_metrics_{seed}.json",
     "merchant_margin_half": "arm_b_merchant_margin_half_metrics_{seed}.json",
     "fifo_under_cap": "arm_b_fifo_under_cap_metrics_{seed}.json",
+    # Phase 6: additive evidence streams, never overwriting the four
+    # Phase 4 filenames above -- sim/arm_b_cli.py's _result_path already
+    # writes any non-headline ablation to its own "arm_b_{ablation}_..."
+    # file, so adding these two keys here costs nothing to the Phase 4
+    # record and only teaches this gate how to read them back.
+    "phase6_heuristic": "arm_b_phase6_heuristic_metrics_{seed}.json",
+    "phase6_model": "arm_b_phase6_model_metrics_{seed}.json",
 }
 
 

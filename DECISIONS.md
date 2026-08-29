@@ -182,3 +182,21 @@ Phase 5 — Audit & Explainability
   T-26 exit-criterion tests. Fixed by adding a postgres:16 service (image
   matching docker-compose.yml) plus a schema-apply step to
   .github/workflows/ci.yml.
+
+  Phase 6 — Intelligence layer
+Exit criterion (spec §18.1): "models beat the heuristic — or are honestly reported as not doing so, with the ablation committed." Result: the honest branch, not the models-win branch.
+
+phase6_heuristic (the new model-agnostic scorer seam, run as the frozen HeuristicScorer) reproduces the Phase 4 headline exactly — bit-for-bit on every reported metric — across all five precommitted seeds (7, 42, 101, 2024, 31337). This is the regression proof that the new seam didn't silently change behavior.
+
+The uplift T-learner and fatigue-hazard model are both implemented but report available=False on this dataset, for concrete data-availability reasons, identically across all five seeds:
+
+uplift: no treated/control split exists — every eligible risk item is contacted exactly once; a T-learner needs real variation, which requires a holdout arm that doesn't exist until Phase 7.
+fatigue hazard: neither ContactOutcome nor ContactState carries any real opt-out signal yet (optouts_by_channel is always {}, unwritten by any generator code).
+phase6_model therefore falls back to the same heuristic and also reproduces the headline exactly. No unsupported ML improvement is claimed.
+
+Offline optimality-gap measurement (sim/optimality_gap.py, exact per-window multiple-choice-knapsack DP, tested against brute force): mean gap ratio ≈0.9996 (worst-case ≈0.9994) at headline merchant-margin capacity; ≈0.9994 (worst-case ≈0.9985) at half capacity as a stress test. The shipped greedy allocator is empirically within ~0.05–0.15% of the measured per-window optimum — this is a lower bound, since the DP doesn't search incentive downgrades itself.
+
+What broke, and what we did about it: mid-evidence-run, the host's C: drive filled to 100%, crashing Docker Desktop and killing the live Postgres connection an evidence run was using. sim/arm_b.py's per-run cleanup (_cleanup_postgres_run, a finally block) needs a live connection to reset its own transactional rows, so it never ran — leaving 399 orphaned grant_requests/grants/etc. rows. The next rerun's registry-cleanup step (which only ever cleared agents/capability_scopes) then failed on an FK constraint because of those orphans. Found by reading the FK error and tracing it to the dead-connection cleanup gap; fixed by extending run_phase6_evidence.sh's cleanup to also clear the same tables _cleanup_postgres_run already documents as safe to reset. Two further self-inflicted false starts on the same rerun (forgot to activate .venv; a fresh shell missing .env) were fixed the same session.
+
+Full regression suite: 588 passed, 3 skipped (pre-existing, unrelated to Phase 6).
+
