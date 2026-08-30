@@ -378,8 +378,17 @@ one and present it as settled.
 | 5 — Audit chain / explainability | CLOSED |
 | 6 — Intelligence layer | CLOSED (evidence committed `510e5fa`) |
 | 7 — Attribution & policy compiler | **ENGINEERING CLOSED.** Evidence preserved at the documented seed-42 scope. Design decisions recorded in `DECISIONS.md`. See the three-way distinction below — this is not the same claim as "nothing remains." |
-| 8 — Demo surface | DEFERRED, not started |
-| 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | DEFERRED, not started |
+| 8 — Demo surface | **CLOSED.** FastAPI + SSE + vanilla-JS one-screen trace, deterministic ~40s replay, all three §12.3 failures, all seven §12.4 chaos controls. Implemented, tested, demonstrated live, decisions recorded in `DECISIONS.md`, and committed. One owner validation item remains open and is named below — it is not an engineering gap. |
+| 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | DEFERRED, **not started** |
+
+**PHASES 0–8 CLOSED. PHASE 9 NOT STARTED.**
+
+The single item still outstanding anywhere in Phases 0–8 is Phase 8's
+cold-viewer criterion (spec §18.1: "someone who hasn't heard the pitch can
+watch it and tell you what got denied and why"). That is an OWNER VALIDATION
+— it requires showing the running demo to a person, which no test can do.
+Everything it depends on is implemented and demonstrated; see the Phase 8
+block at the end of this section for exactly what was and was not verified.
 
 Phase 7 closure is genuinely three separate claims, kept distinct rather than
 collapsed into one "done":
@@ -403,9 +412,9 @@ collapsed into one "done":
   This closes the two items that were previously blocking Phase 8 for
   procedural, not engineering, reasons.
 
-Phase 8 is ready to start on the next session's own terms — this session
-implements no Phase 8 code (see the Phase 8 readiness section in the
-closure report delivered to the user).
+(Historical note, left as written: at the time of the Phase 7 closure session
+Phase 8 had not yet begun. It has since been implemented, tested, demonstrated
+and committed — see the Phase 8 block at the end of this section.)
 
 **Correction to this section, made during the Phase 7 session that follows
 (re-verified directly against the repository, not assumed from this file):**
@@ -693,5 +702,174 @@ scope reductions listed above stated explicitly rather than hidden. See
 the closure session's own final report (delivered to the user, not
 duplicated here) for the complete implemented/tested/evidenced
 breakdown and the prepared `DECISIONS.md` entry text.
+
+---
+
+**Phase 8 status (Demo surface): CLOSED — implemented, tested, demonstrated,
+recorded in `DECISIONS.md`, and committed.** Spec §18.1's exit criterion —
+"someone who hasn't heard the pitch can watch it and tell you what got denied
+and why" — is the one criterion that cannot be automated. Everything it
+depends on is demonstrated by executable evidence below. The strongest
+repository-level validation possible was performed (see "Cold-viewer
+validation" at the end of this block) and it surfaced one real clarity defect,
+which was fixed. **Showing the running demo to an actual first-time viewer
+remains an OWNER action and is the only thing still open in Phases 0–8.**
+
+**What was built (all new files, plus three additive audit edits):**
+`sampark/demo/` — `isolation.py` (throwaway-schema isolation),
+`scenario.py` (deterministic seed-42 subset), `clock.py` (simulated time +
+computed compression ratio), `provider.py` (the channel-failure boundary that
+did not exist), `enforcement.py` (the stage-two rate ceiling — the missing
+`max_requests_per_hour` enforcement), `scorer_kill.py` (runtime-killable
+Phase 6 `Scorer` wrapper), `chaos.py` (the seven §12.4 controls),
+`runner.py` (the window loop), `cli.py` (headless runner).
+`ui/` — `app.py`, `routes.py`, `sse.py`, `session.py`, `models.py`,
+`static/{index.html,app.js,styles.css}`.
+Additive only, in `sampark/audit/`: `event_types.py` (+`MODEL_DEGRADED`),
+`emit.py` (+`event_for_model_degraded`), `sink.py` (+`record_agent_struck`,
+`record_agent_revoked`, `record_model_degraded` — wiring emitters that had
+existed and been unit-tested since Phase 5 with no caller).
+
+**Protected files: UNTOUCHED, verified byte-identical.**
+`git diff aa87123 HEAD -- sampark/allocator/constants.py
+sampark/allocator/calibrated.py sampark/budget/issuance.py
+sampark/policy/hard/ sampark/policy/soft/ sampark/policy/types.py` is EMPTY.
+`sim/**`, `agents/**`, `sampark/registry/**`, `sampark/mediation/**`,
+`sampark/models/**`, `sampark/schema.sql` and `results/**` are unmodified.
+Phase 4 gate re-run read-only: mean A 89387.38, mean B 156957.37, uplift
+[1.7114, 1.8822], `constants_commit_sha aa87123…`, **GATE: PASS**;
+`results/gate_headline.json` hash `ed82eeb6…` unchanged.
+
+**Three decisions that diverge from a literal reading of the spec, each
+deliberate and each surfaced in the UI and README rather than buried:**
+
+1. **Only `agent.rate_ceiling_exceeded` accumulates a strike.** §12.3's
+   literal list is "budgets, rate ceiling and quiet hours deny. Strikes
+   accumulate." Budget/allocation denials and quiet-hours deferrals are the
+   NORMAL outcome for a well-behaved agent and occur in the thousands in
+   every committed Arm B run; striking on them would revoke all four honest
+   agents within one run and turn the "scope violations = 0" headline into a
+   screen of false accusations. The denials all still happen and are all
+   shown; only the STRIKE is narrowed. Asserted by
+   `tests/demo/test_rate_ceiling_and_strikes.py::test_losing_a_fair_contest_can_never_strike`.
+2. **Chaos control 7 drives `dispute_open`, not `rto_flag`.** The `rto_flag`
+   interlock row is declared with a condition that returns `None`
+   unconditionally — it never reads the ledger and can only report
+   FACT_UNAVAILABLE. Making it deny needs edits to `policy/hard/interlocks.py`
+   AND `policy/types.py` (both protected) and would flip
+   `fact_unavailable.rto_flag` from *recorded* to *resolved*, changing the
+   committed Phase 4/6/7 counts. `dispute_open` is a real, working DENY row
+   of the same matrix. Carried in the control's own `spec_note` so it reaches
+   the screen.
+3. **`record_scope_denial` remains unwired.** Stage-one scope denials do not
+   strike, so the revocation on camera is unambiguously caused by stage two —
+   the contrast §12.3 calls "the entire thesis in ninety seconds". Pinned by
+   `test_record_scope_denial_has_no_production_call_site`.
+
+**The retry semantics are a finding, not a shortcut.** "Rollback then retry
+the same request" is not implementable here: `budget/issuance.py` step (1)
+returns any existing grant for a `request_id` regardless of state,
+`grant_id = uuid5(NS_GRANT, request_id)`, and `ROLLED_BACK` is terminal in
+both lifecycle modules — so re-issuing would require editing the human-owned
+SERIALIZABLE transaction. Spec §6.2 never asked for it: "slot is NOT silently
+consumed; no double-send on retry" is TWO promises, kept by the rollback and
+by a `grant_id`-keyed provider idempotency store respectively.
+
+**Model availability is NOT reinterpreted.** `build_scorer()` still returns
+`HeuristicScorer` on this dataset (no untreated control population — the
+committed Phase 6 finding). Phase 8 records that as a real degradation
+(`model.artifact_unavailable`) at run start rather than starting silently
+degraded, and the chaos control injects a second, distinct reason
+(`model.killed_by_operator`). Both converge on the same deterministic
+fallback. **Nothing anywhere claims the uplift model was available.**
+
+**Evidence collected live this session (every number from a real command):**
+- Deterministic replay: 113 audit events, head hash
+  `333be7b8129a988ae3822079ad5279902093435cc2023ebe45994a3e0382b318`,
+  reproduced IDENTICALLY across three independent execution paths — the
+  headless `sampark.demo.cli`, the FastAPI `TestClient`, and a live `uvicorn`
+  server. Both determinism tiers hold (logical projection AND full canonical
+  bytes including signatures).
+- One hands-off replay produces all three §12.3 failures: `grant.rolled_back`
+  ×1 (with 2 real provider retries), `scope.channel_not_allowed` ×1 +
+  `scope.incentive_ceiling_exceeded` ×1 (stage one), `agent.rate_ceiling_exceeded`
+  ×3 → `agent.struck` ×3 → `agent.revoked` ×1 → `scope.agent_revoked` ×4
+  (stage two), and `model.degraded` ×2 (both reasons).
+- The four honest agents finish ACTIVE with `strike_count = 0`.
+- Demo chain verifies after every failure mode: `VALID: True`,
+  `genesis_ok: True`, `linkage_ok: True`, no missing grant reservations.
+- `public.audit_events` unchanged at **560 events**, head
+  `bf4ad0d0…b18244`, before and after every run.
+
+**What broke during Phase 8, and the fix (for the owner's `DECISIONS.md`,
+not written there by Claude per §13):** a post-run residue check found a row
+in `public.budget_windows` dated `2025-09-10` — a DEMO window date — beside
+the one documented pre-existing `2099-01-01` fixture artifact. Cause:
+`DemoSession.reset()` dropped the demo schema while the runner thread was
+still mid-run, and `drop_demo_schema` then reset that shared connection's
+`search_path` to `public`; the surviving daemon thread's next unqualified
+`seed_budget_window` INSERT resolved against `public`. Fixed in three layers
+— a cooperative `DemoRunner.request_stop()` checked at window boundaries;
+teardown now stops and joins the thread BEFORE dropping; and
+`drop_demo_schema` now leaves `search_path` EMPTY rather than `public`, so
+anything escaping the first two layers fails loudly with "relation does not
+exist" instead of silently writing to the real database. Pinned by
+`tests/demo/test_reset_never_leaks_into_public.py` (4 tests). The stray row
+was deleted; `public.audit_events` was never affected.
+
+**Separately observed, PRE-EXISTING, not caused by Phase 8:** running
+`tests/audit/**` removes the four residual `public.agents` /
+`public.capability_scopes` rows. Those fixtures use `search_path TO <schema>,
+public` (documented in `tests/audit/conftest.py`), so `agents` — not
+duplicated in their isolated schema — falls through to `public`, and their
+teardown deletes the same `agent_id`s the Arm B evidence runner registers.
+CLAUDE.md already described those four rows as inert residue that "nothing
+depends on being absent". No Phase 8 code writes to `public` at all (verified
+by grep: every `public.` reference under `sampark/demo/` and `ui/` is a
+read-only SELECT or a docstring). Flagged rather than silently absorbed.
+
+**Deliberately scoped down, stated rather than skipped:** no LLM-rendered
+explanation (spec §8.10) — `ANTHROPIC_API_KEY` is present but EMPTY, so the
+call cannot be exercised or verified (CLAUDE.md §8/§14); the deterministic
+`format_explanation` ships instead, returning the raw events the sentence was
+derived from so it can be checked against the record. No authentication (§13
+"Out"); the demo binds to 127.0.0.1 and its safety rests on structural schema
+isolation, not on access control. No recovery-outcome modelling in the demo —
+Phase 8 is a decision-trace demo, not an evidence run, so grants settle at
+their reserved ceiling and Arm A/B economics remain `sim/`'s job. No new
+`results/*.json` evidence matrix was produced or needed.
+
+**Cold-viewer validation (owner-closure pass).** A harness applied
+`ui/static/app.js`'s OWN classification logic to a live run and checked, for
+each of the seven comprehension questions a first-time viewer must be able to
+answer, whether the information is actually present and visible in what the UI
+renders: what happened (7 pipeline stages light), what was denied (38 denial
+rows in the loudest region, each with its reason code), why (every denial
+carries a machine reason code, and click-through yields the deterministic
+sentence "DENIED on scope: scope.channel_not_allowed. The allocator never
+ran."), what rolled back and recovered (1 `grant.rolled_back` violet + 9
+`grant.confirmed` green), what became of the rogue agent (both stages, 3
+strikes counting 1→2→3, revocation, then 4 `scope.agent_revoked` denials),
+what happened when the model was killed (both degradation reasons, fallback to
+`HeuristicScorer`, 10 grants still issued), and that the display comes from
+the audit trace (every row carries `event_id`/`prev_hash`/recomputed `hash`
+and chains; `/api/verify` VALID). All seven pass.
+
+That validation found ONE genuine clarity defect and it was fixed additively,
+with no backend change: **"compliance held" was not visible anywhere**, even
+though spec §12.3 calls the recovery-drops-compliance-does-not distinction
+"the whole design philosophy". Three compliance tiles were added — quiet-hour
+violations, contact-cap breaches, and scope violations by honest agents —
+computed ENTIRELY from fields already present on the streamed audit events
+(`grant.reserved.send_after`/`customer_id`/`window_id`,
+`request.denied_on_scope.agent_id`), so they remain audit-derived system truth
+inside `auditState` and do not weaken the trace-integrity rule. They render
+green at zero and red if ever non-zero. All three read 0 on a real run.
+`tests/test_ui_renders_only_audit_events.py` and `tests/ui/**` were re-run
+after this change: 50 passed.
+
+**Phase 9 remains Phase 9.** No sensitivity sweep, no final A/B/H table, and
+`ARCHITECTURE.md` / `DISCLAIMER.md` are still 0 bytes. No Phase 9 work has
+been started, designed, or scaffolded.
 
 Update this section at each phase boundary.

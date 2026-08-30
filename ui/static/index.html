@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAMPARK — live trace</title>
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="logo">SAMPARK</span>
+    <span class="tagline">mediation layer for revenue-recovery agents &middot; live trace</span>
+  </div>
+  <div class="badges">
+    <span id="badge-time" class="badge badge-sim" title="Simulated time is compressed for viewing. This ratio is computed from the scenario, never hard-coded.">SIMULATION</span>
+    <span id="badge-seed" class="badge">seed &mdash;</span>
+    <span id="badge-state" class="badge">idle</span>
+  </div>
+  <div class="controls">
+    <button id="btn-run" class="primary">Run replay</button>
+    <button id="btn-reset">Reset</button>
+    <button id="btn-verify">Verify chain</button>
+    <button id="btn-export">Export</button>
+  </div>
+</header>
+
+<!-- TRACE-INTEGRITY BANNER. Stated on screen, not just in the README. -->
+<div id="integrity-banner">
+  This page renders the hash-chained audit log and nothing else.
+  Every node, colour and counter below is derived from
+  <code>audit_events</code> streamed over SSE.
+  The <span class="chip chip-control">demo control</span> region is the only
+  part that is not, and it is marked as such.
+</div>
+
+<main>
+
+  <!-- LEFT: the flow trace -->
+  <section id="pane-trace">
+    <h2>Flow trace <span class="sub">nodes light when their audit event arrives</span></h2>
+
+    <ol id="pipeline">
+      <li data-node="request"   ><span class="n">1</span> signal &rarr; signed request</li>
+      <li data-node="scope"     ><span class="n">2</span> registry &middot; scope</li>
+      <li data-node="rate"      ><span class="n">3</span> registry &middot; rate ceiling</li>
+      <li data-node="policy"    ><span class="n">4</span> hard policy filter</li>
+      <li data-node="allocate"  ><span class="n">5</span> score &amp; allocate</li>
+      <li data-node="reserve"   ><span class="n">6</span> reserve (SERIALIZABLE)</li>
+      <li data-node="execute"   ><span class="n">7</span> execute &middot; provider</li>
+      <li data-node="settle"    ><span class="n">8</span> confirm | rollback</li>
+      <li data-node="registry"  ><span class="n">9</span> strike | revoke | degrade</li>
+    </ol>
+
+    <div class="legend">
+      <span class="sw sw-granted"></span>granted
+      <span class="sw sw-scope"></span>denied &middot; scope
+      <span class="sw sw-policy"></span>denied &middot; budget/policy
+      <span class="sw sw-rolled"></span>rolled back
+      <span class="sw sw-pending"></span>pending
+    </div>
+
+    <h2>Denials <span class="sub">the thesis — loudest on the page</span>
+      <span id="denial-count" class="count">0</span></h2>
+    <div id="denials"></div>
+
+    <h2>All events <span class="sub">click any row to explain it</span></h2>
+    <div id="feed"></div>
+  </section>
+
+  <!-- RIGHT: the raw record -->
+  <section id="pane-raw">
+    <h2>Raw audit event <span class="sub">exactly what was written to the chain</span></h2>
+    <pre id="raw">Select an event on the left.
+
+Nothing on this page is synthesised: each field below is a
+column value from a row that sampark.audit.chain.append
+wrote, and `hash` is recomputed from the event, never
+read from a column (there is no hash column, deliberately).</pre>
+
+    <h2>Explanation <span class="sub">from sampark.audit.explain — generated from the log</span></h2>
+    <div id="explanation" class="muted">Click an event with a request_id.</div>
+    <pre id="explain-events" class="small"></pre>
+  </section>
+
+</main>
+
+<footer>
+  <section id="metrics">
+    <h3>Live &middot; from the audit stream</h3>
+    <div class="metric-grid">
+      <div><b id="m-events">0</b><span>events</span></div>
+      <div><b id="m-requests">0</b><span>requests</span></div>
+      <div><b id="m-granted">0</b><span>granted</span></div>
+      <div><b id="m-denied">0</b><span>denied</span></div>
+      <div><b id="m-deferred">0</b><span>deferred</span></div>
+      <div><b id="m-rolled">0</b><span>rolled back</span></div>
+      <div><b id="m-strikes">0</b><span>strikes</span></div>
+      <div><b id="m-revoked">0</b><span>revoked</span></div>
+    </div>
+    <h3 class="ref">Compliance held <span class="sub">derived from the same audit events &mdash;
+      recovery may drop, these must not</span></h3>
+    <div class="metric-grid">
+      <div class="ok"><b id="m-quiet_violations">0</b><span>quiet-hour violations</span></div>
+      <div class="ok"><b id="m-cap_breaches">0</b><span>contact-cap breaches</span></div>
+      <div class="ok"><b id="m-honest_scope_violations">0</b><span>scope violations, honest agents</span></div>
+    </div>
+    <h3 class="ref">Reference &middot; Arm A vs Arm B
+      <span class="sub">committed evidence file, NOT audit-derived</span></h3>
+    <div class="metric-grid ref-grid">
+      <div><b>89,387</b><span>Arm A paise/contact</span></div>
+      <div><b>156,957</b><span>Arm B paise/contact</span></div>
+      <div><b>1.71&ndash;1.88&times;</b><span>uplift, 5 seeds</span></div>
+      <div><b>0</b><span>scope violations, honest agents</span></div>
+    </div>
+    <p class="src">source: <code>results/gate_headline.json</code> (Phase 4, frozen).
+      Arm A has no audit log, so this row cannot be audit-derived — it is
+      labelled rather than blended into the live trace.</p>
+  </section>
+
+  <section id="chaos">
+    <h3>Chaos panel <span class="chip chip-control">demo control</span>
+      <span class="sub">spec §12.4 &mdash; hand over the laptop</span></h3>
+    <div id="chaos-list"></div>
+  </section>
+</footer>
+
+<div id="toast"></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

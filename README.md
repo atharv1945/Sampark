@@ -644,3 +644,302 @@ every change above): **779 passed, 3 skipped**, exit 0. The concurrency
 test (`tests/test_concurrent_grant_issuance.py`) and `python -m sampark.audit.verify`
 (`VALID: True`, 560 events) were both re-confirmed standalone
 afterward.
+
+---
+
+## Phase 8 — Demo surface
+
+Exit criterion (spec §18.1): *"Someone who hasn't heard the pitch can watch
+it and tell you what got denied and why."*
+
+A one-screen live trace over the already-complete Phases 0–7. The UI is
+roughly 5% of the engineering and is deliberately a thin observation surface:
+every decision it renders was made by unmodified Phase 3/4/6 code.
+
+### Launch
+
+```bash
+# 1. infrastructure (Postgres 16 + Redis); schema applied once
+docker compose up -d
+psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" \
+     -d "$POSTGRES_DB" -f sampark/schema.sql        # first time only
+
+# 2. environment (same convention as every other CLI in this repo)
+set -a; source .env; set +a
+
+# 3. the demo
+python -m uvicorn ui.app:app --host 127.0.0.1 --port 8000
+# open http://127.0.0.1:8000 and press "Run replay"
+```
+
+Headless — the same run, all three failures, no browser:
+
+```bash
+python -m sampark.demo.cli --verify
+```
+
+`ui/` is a transport shell. Delete it and every Phase 8 behaviour is still
+implemented and still tested; `sampark.demo.cli` demonstrates all three
+failures with no HTTP layer at all. The UI must never be the thing that makes
+a failure "work".
+
+### The trace-integrity rule (spec §12.1) — enforced, not asserted
+
+> The UI renders the audit log and nothing else.
+
+`ui/sse.py` contains exactly one SQL statement and it names exactly one
+table, `audit_events`. The frontend keeps three stores that are never merged:
+`auditState` (system truth, written only by `ingestAuditEvents`, reachable
+only from the SSE handler and its gap-repair fetch), `controlState` (demo
+control state — run status, chaos arming — rendered in its own marked
+region), and presentation state. There is no `emit_demo_event()`, no
+websocket, no second channel.
+
+`tests/test_ui_renders_only_audit_events.py` enforces this four ways:
+statically on the backend query and imports; statically on the frontend's
+store writer and its call sites; by proving the banned tokens are *used*
+nowhere (they may be quoted — comments and string literals are stripped
+before scanning, because `ui/sse.py` correctly cites the rule verbatim); and
+adversarially against a live run, where every served event is matched to a
+real row and a fabricated fact pushed at the API is refused (400/422) without
+touching the chain.
+
+One row is honestly **not** audit-derived and is labelled as such on screen:
+the Arm A reference numbers, from the committed `results/gate_headline.json`.
+Arm A has no audit log, so it cannot be audit-derived; spec §12.2 wants the
+side-by-side, so it is shown and marked rather than blended in.
+
+### The three live failures (spec §12.3)
+
+All three occur in a single hands-off replay, with no chaos input at all.
+
+**1. Provider timeout → rollback → idempotent retry.**
+`agents/channel.py`'s Phase 2 mock always succeeded, so no failure path
+existed. `sampark/demo/provider.py` wraps it unchanged and adds a
+`grant_id`-keyed idempotency store plus three failure modes. `HARD_DOWN`
+exhausts the retries and the runner calls the existing `rollback_grant`:
+margin is released in both pools, the contact slot's `released_at` is set,
+and `margin_spent_paise` is untouched — the reservation was returned, not
+burned.
+
+The retry is **provider-level**, and that is a finding rather than a
+shortcut. `budget/issuance.py` step (1) returns any existing grant for a
+`request_id` regardless of state, and `grant_id = uuid5(NS_GRANT,
+request_id)`, so one request owns one grant permanently; `ROLLED_BACK` is
+terminal in both lifecycle modules. Re-issuing after a rollback would mean
+editing the human-owned SERIALIZABLE transaction. Spec §6.2 never asked for
+it: its guarantee is *"slot is NOT silently consumed; no double-send on
+retry"* — two separate promises, kept by the rollback and by the idempotency
+store respectively. `ACCEPT_THEN_TIMEOUT` covers the hard case where the
+provider delivered and *then* the caller timed out: the retry returns the
+stored receipt and contacts nobody twice.
+
+**2. Rogue agent, two stages.**
+Stage 1 — a `voice` channel it never declared, and 4000 bps against its
+declared 200 — denied by the Registry on signature-verified scope, with the
+allocator never invoked. Stage 2 — in scope: a 23:15 request deferred on
+`policy.quiet_hours`, then six correctly-scoped requests inside one simulated
+minute against its declared `max_requests_per_hour = 3`, so requests 4–6 are
+denied `agent.rate_ceiling_exceeded`, accumulate three strikes, and the key is
+revoked. Afterwards it cannot produce a verifiable request at all
+(`scope.agent_revoked`).
+
+`CapabilityScope.max_requests_per_hour` had been declared, persisted and
+CHECK-constrained since Phase 3 and read by **no evaluation code anywhere**.
+`sampark/demo/enforcement.py` is that missing enforcement. It sits after
+`evaluate_scope` and before candidate construction — not inside
+`evaluate_scope` (which would collapse the two stages), not as a 12th
+`HARD_RULES` entry (protected, and would change committed `fact_unavailable`
+counts), and not inside `mediate_window` (the Phase 4 decision path).
+
+**Only `agent.rate_ceiling_exceeded` strikes.** Budget and allocation denials
+and quiet-hours deferrals must never strike: they are the normal, correct
+outcome for a well-behaved agent and occur in the thousands in every committed
+Arm B run, so striking on them would revoke all four honest agents within one
+run. An agent is struck for misusing the protocol — asking too often — never
+for losing a fair contest. This is deliberately narrower than §12.3's literal
+list ("budgets, rate ceiling and quiet hours deny. Strikes accumulate"); the
+denials all still happen and are all shown, only the *strike* is narrowed.
+`record_scope_denial` remains unwired, so the revocation on screen is
+unambiguously caused by stage two.
+
+**3. Model kill → heuristic fallback, compliance intact.**
+`sampark/demo/scorer_kill.py` wraps the Phase 6 `Scorer` protocol; a kill
+makes `score()` raise, the runner emits `model.degraded`, swaps in
+`default_scorer()` (the frozen Phase 4 heuristic, bit-for-bit) and re-runs the
+window.
+
+**Stated plainly: the uplift model is unavailable on this dataset.**
+`build_scorer()` already returns a `HeuristicScorer` because the T-learner has
+no untreated control population — the committed Phase 6 finding, which Phase 8
+does not reinterpret. So the demo surfaces *both* real degradation reasons and
+treats them identically: `model.artifact_unavailable` (true on every run,
+emitted at start) and `model.killed_by_operator` (injected live). That
+equivalence is the argument — SAMPARK handles "never had a model" and "the
+model died mid-run" the same way: detect, degrade, log, keep issuing compliant
+grants. Recovery quality may drop; quiet-hour violations, cap breaches and
+scope violations stay at zero across the boundary, and that is asserted.
+
+### The seven chaos controls (spec §12.4)
+
+Recovered verbatim from §12.4's table — not invented, not padded. Each maps to
+a real backend mechanism whose *effect* reaches the chain. Arming a control is
+never itself audited: the log is the decision record, not a UI activity feed.
+A control that cannot apply returns **409**, changes nothing, and writes
+nothing — it never fakes an effect.
+
+| # | Control | Mechanism |
+|---|---|---|
+| 1 | Kill uplift model | `KillableScorer.kill()` → `model.degraded` |
+| 2 | Revoke agent key | `strikes.revoke()` → `agent.revoked` → `scope.agent_revoked` |
+| 3 | Set clock to 21:40 | re-times the next request's `proposed_send_after` |
+| 4 | Force provider timeout | `MockProvider.arm()` → `grant.rolled_back` |
+| 5 | Flood rogue agent to 6 req/min | rate ceiling → 3 strikes → revocation |
+| 6 | Mark customer opted-out mid-run | `UPDATE contact_states` → `policy.opt_out_active` |
+| 7 | Trigger RTO flag on an active cart | **substituted** — see below |
+
+**Control 7 is a documented substitution.** `sampark/policy/hard/interlocks.py`
+declares the `rto_flag` row with a condition that returns `None`
+unconditionally: it never reads the ledger and can only ever report
+`FACT_UNAVAILABLE`. Making it deny would require editing that file *and*
+`sampark/policy/types.py` (both protected) and would flip
+`fact_unavailable.rto_flag` from *recorded* to *resolved*, changing the
+committed Phase 4/6/7 counts. The control therefore drives `dispute_open` — a
+real, working DENY row of the same interlock matrix, reading
+`RiskItem.root_cause`. Same mechanism demonstrated, zero protected-file
+changes. The substitution is carried in the control's own `spec_note`, so it
+surfaces in the UI as well as here.
+
+### Clock and time compression (spec §12.1)
+
+Simulated time and wall-clock time are kept in separate compartments. Every
+instant handed to the system is a real simulated `datetime` derived from the
+scenario — nothing is monkeypatched, and `datetime.now` is never read on the
+decision path (still structurally tested). Wall-clock pacing is presentation
+only and cannot change a decision, a reason code, or the event order. The
+compression ratio is **computed** from the scenario's actual span and
+displayed; §12.1's illustrative "1 sim-hour ≈ 0.4s" is not hard-coded, because
+printing a figure that is not the real one would itself be the unlabelled time
+manipulation the same paragraph forbids. At seed 42 the badge reads
+`1 sim-hour ~ 0.67s` over a 40-second replay.
+
+Chaos control 3 is *not* a clock mock — it sets a request's
+`proposed_send_after`, and `policy.hard.quiet_hours.evaluate` is a pure
+function of the instant it is given.
+
+### Deterministic replay
+
+Seed 42, the committed generator, in memory: 8 customers, 56 risk items, 29
+honest actions across all four agents, 10 scripted rogue requests, 5 windows,
+**113 audit events**, ~40 seconds. The subset is selected by a documented,
+random-free rule (rank customers by contended windows, then amount, then id).
+There is no second generator and no hand-authored fixture world.
+
+Two determinism tiers are asserted separately rather than conflated:
+
+- **Tier 1 (logical)** — same events, same order, same `event_id`s and reason
+  codes.
+- **Tier 2 (byte)** — same canonical bytes and the same chain **head hash**,
+  achievable because `sim/arm_b.py::_deterministic_keypair` is reused rather
+  than reimplemented, so signatures are reproducible too.
+
+Measured: head hash
+`333be7b8129a988ae3822079ad5279902093435cc2023ebe45994a3e0382b318` reproduced
+identically across the headless CLI, the FastAPI `TestClient`, and a live
+`uvicorn` server. `seq` is the SSE transport cursor only and is never treated
+as logical identity.
+
+### Isolation — the demo cannot touch the protected chain
+
+`sampark/audit/chain.py` maintains one hash chain per PostgreSQL schema, so a
+demo append into `public.audit_events` would extend the real 560-event
+Phase 0–7 chain irreversibly (the table is append-only by trigger). Each run
+therefore gets its own `sampark_demo_<unix_ts>_<hex>` schema, built by applying
+`sampark/schema.sql` **verbatim** under a `search_path` that deliberately omits
+`public` — so the demo cannot even read the shared 120k-row `risk_items` table,
+let alone write the chain. Cleanup is `DROP SCHEMA CASCADE`, which is DDL and
+therefore never intercepted by the append-only triggers.
+
+Four cleanup layers: reset drops; a new run drops the prior; shutdown drops;
+and startup sweeps `sampark_demo_%` schemas older than six hours — the only
+layer that recovers from a hard crash, which is exactly what the Phase 6
+disk-full incident produced.
+
+`tests/demo/test_public_audit_untouched.py` asserts the `public` fingerprint
+before and after a complete run.
+
+### One new audit event type, and only one
+
+`model.degraded`. Spec §12.3 requires the allocator to "log a degradation
+event" and no existing type carries that fact. Everything else reuses the
+existing vocabulary: the rate-ceiling denial is a `decision.denied` with a new
+reason-code *string* (`event_for_decision` copies reason codes verbatim and
+validates nothing against a closed set), and `agent.struck` / `agent.revoked`
+had existed and been unit-tested since Phase 5 with no caller — Phase 8 is the
+wiring, not a new mechanism.
+
+### What broke during Phase 8, and what fixed it
+
+A post-run residue check found a row in `public.budget_windows` dated
+`2025-09-10` — a *demo* window date — beside the one documented pre-existing
+`2099-01-01` fixture artifact. Diagnosis: `DemoSession.reset()` dropped the
+demo schema while the runner thread was still mid-run, and `drop_demo_schema`
+then reset that shared connection's `search_path` to `public`; the surviving
+daemon thread's next unqualified `seed_budget_window` INSERT resolved against
+`public`. Fixed in three layers — a cooperative `DemoRunner.request_stop()`
+checked at window boundaries; teardown now stops and joins the thread *before*
+dropping; and `drop_demo_schema` now leaves `search_path` **empty** rather than
+`public`, so anything that escapes the first two layers fails loudly with
+"relation does not exist" instead of silently writing to the real database.
+`tests/demo/test_reset_never_leaks_into_public.py` pins all three. The stray
+row was removed; `public.audit_events` was never affected.
+
+### Cold-viewer validation
+
+Spec §18.1's exit criterion is *"someone who hasn't heard the pitch can watch
+it and tell you what got denied and why."* That is the one criterion pytest
+cannot settle, so it is split honestly:
+
+**What was verified mechanically.** A harness applies `ui/static/app.js`'s own
+classification logic to a live run and checks, for each of the seven questions
+a first-time viewer must be able to answer, whether the information is present
+and visible in what the UI renders — what happened (7 pipeline stages light),
+what was denied (38 denial rows in the loudest region, each with its reason
+code), why (every denial carries a machine reason code; click-through yields
+*"DENIED on scope: scope.channel_not_allowed. The allocator never ran."*),
+what rolled back and recovered, what became of the rogue agent (both stages,
+strikes 1→2→3, revocation, then `scope.agent_revoked`), what happened when the
+model was killed, and that every displayed fact carries its `event_id`,
+`prev_hash` and recomputed `hash` and chains. All seven pass.
+
+**What that validation changed.** It found one real clarity defect:
+**"compliance held" was not visible anywhere**, even though §12.3 calls the
+recovery-drops-compliance-does-not distinction the whole design philosophy.
+Three compliance tiles were added — quiet-hour violations, contact-cap
+breaches, and scope violations by honest agents — computed entirely from
+fields already on the streamed audit events, so they stay audit-derived system
+truth rather than a second source. They are green at zero and **red if ever
+non-zero**. All three read 0 on a real run.
+
+**What remains an owner action.** Showing the running demo to a person who has
+not heard the pitch. No harness can substitute for that, and this README does
+not claim it was done.
+
+### Deliberately out of scope, stated plainly (spec §12.5)
+
+- **The RTO-flag interlock** — `FACT_UNAVAILABLE` by Phase 4 design; control 7
+  substitutes `dispute_open`. Named above.
+- **LLM-rendered explanations** (spec §8.10) — `ANTHROPIC_API_KEY` is present
+  but empty, so the call cannot be exercised or verified. Phase 8 ships the
+  deterministic `format_explanation` only, and returns the raw events the
+  sentence was derived from so it can be checked against the record rather
+  than trusted. No LLM is called anywhere in Phase 8.
+- **Authentication** — the demo binds to `127.0.0.1` and has none (§13
+  "Out"). Anyone who can reach the port can start, reset and inject faults
+  into a throwaway schema. Do not expose it. This is acceptable only because
+  the isolation above is structural.
+- **Recovery-outcome modelling in the demo** — Phase 8 is a decision-trace
+  demo, not an evidence run; grants settle at their reserved ceiling. Arm A/B
+  recovery economics remain `sim/`'s job and the committed evidence's.
+- **Network partition, clock skew across agents, Postgres failover
+  mid-reservation** — named in §12.5 and still not handled.

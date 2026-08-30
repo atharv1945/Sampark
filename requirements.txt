@@ -45,3 +45,13 @@ pyyaml==6.0.3
 psycopg[binary]==3.3.4
 pynacl==1.5.0
 scikit-learn==1.7.2
+
+# Phase 8 scope (demo surface, spec §12/§18.1): FastAPI + uvicorn are the
+# locked demo-surface stack (CLAUDE.md §2). SSE is served with Starlette's
+# own StreamingResponse — no sse-starlette, no websocket library, no
+# frontend framework (spec §12.2 "zero framework debt", §13 "Out").
+# httpx is required by fastapi.testclient.TestClient and is a TEST-ONLY
+# dependency; nothing under sampark/ or ui/ imports it at runtime.
+fastapi==0.121.2
+uvicorn[standard]==0.40.0
+httpx==0.28.1

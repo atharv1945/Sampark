@@ -54,6 +54,7 @@ from sampark.audit.event_types import (
     GRANT_RESERVED,
     GRANT_ROLLED_BACK,
     HOLDOUT_ASSIGNED,
+    MODEL_DEGRADED,
     RECOVERY_CREDITED,
     REQUEST_DENIED_ON_SCOPE,
     REQUEST_RECEIVED,
@@ -70,6 +71,26 @@ PAYLOAD_VERSION = 1
 # not infer one).
 ROLLBACK_REASON = "provider_failure"
 EXPIRY_REASON = "ttl_expired"
+
+# Phase 8 (spec §12.3 failure 3). The two — and only two — reasons the
+# allocator can lose its model-backed scorer. Both are COPIED into the
+# event by the caller that already knows which happened; this module never
+# infers one, exactly as it never infers ROLLBACK_REASON vs EXPIRY_REASON.
+#
+#   ARTIFACT_UNAVAILABLE — the committed model artifact did not load, or
+#       loaded but reported `is_valid_for_scoring() is False`. This is the
+#       REAL, permanent, dataset-driven state on this repository's data:
+#       the uplift T-learner has no control arm (committed Phase 6/7
+#       finding), so `sampark.models.scorer.build_scorer` already returns
+#       the heuristic today. Emitted once at run start whenever that is so.
+#   KILLED_BY_OPERATOR — chaos control 1 killed the scorer seam mid-run
+#       (spec §12.4 row 1, "Kill uplift model").
+#
+# Both converge on the SAME deterministic fallback and the same event, which
+# is the point: SAMPARK treats "never had a model" and "the model died
+# mid-run" identically — degrade, log, keep issuing compliant grants.
+MODEL_DEGRADED_ARTIFACT_UNAVAILABLE = "model.artifact_unavailable"
+MODEL_DEGRADED_KILLED_BY_OPERATOR = "model.killed_by_operator"
 
 
 def _round_paise(value: float) -> int:
@@ -349,6 +370,54 @@ def event_for_agent_revoked(agent_after_revocation: Agent, at: datetime, reason_
         AGENT_REVOKED, event_id_for(AGENT_REVOKED, agent_after_revocation.agent_id), at,
         None, reason_code,
         {"agent_id": agent_after_revocation.agent_id, "strike_count": agent_after_revocation.strike_count},
+    )
+
+
+# --- Phase 8 (spec §12.3 failure 3) -----------------------------------------
+
+
+def event_for_model_degraded(
+    reason_code: str,
+    scorer_before: str,
+    scorer_after: str,
+    window_id: date,
+    occurred_at: datetime,
+) -> AuditEvent:
+    """Spec §12.3 failure 3: the allocator "logs a degradation event" when
+    it loses its model-backed scorer and falls back to the frozen Phase 4
+    heuristic.
+
+    `scorer_before` / `scorer_after` are CLASS NAMES supplied by the caller
+    (e.g. `"ModelBackedScorer"` -> `"HeuristicScorer"`), never derived here
+    — this module copies, it does not inspect the allocator.
+
+    Unsigned: no agent requested a scorer failure, so there is no signature
+    to attach. Matches `event_for_agent_registered`'s existing unsigned
+    precedent (`sampark.audit.event_types.SIGNED_EVENT_TYPES` excludes both).
+
+    `event_id` is keyed on (window_id, reason_code): one degradation of a
+    given kind per window is one fact, so a retried or repeated kill in the
+    same window re-derives the same id and `chain.append` returns
+    `AlreadyAppended` — the chain never advances twice for it (Phase 5A §3.1
+    /§8.6's idempotency rule, unchanged).
+
+    Every payload value is an ASCII identifier or an ISO date, so it passes
+    `sampark.audit.canonical`'s `_SAFE_PAYLOAD_STRING_RE` unchanged. Notably
+    the human-readable *reason text* is deliberately NOT carried: free text
+    is banned from payloads (Phase 5A §4.3 rule 3 / §10), the exact rule
+    that already forced `Agent.publisher` out of `event_for_agent_registered`.
+    """
+    return _draft(
+        MODEL_DEGRADED,
+        event_id_for(MODEL_DEGRADED, _date_str(window_id), reason_code),
+        occurred_at,
+        None,
+        reason_code,
+        {
+            "window_id": _date_str(window_id),
+            "scorer_before": scorer_before,
+            "scorer_after": scorer_after,
+        },
     )
 
 

@@ -41,6 +41,29 @@ Natural recovery itself is NOT an event type: the audit log is SAMPARK's
 DECISION record, and a natural outcome is something the WORLD did to an
 item SAMPARK never touched — it reaches the log only as `natural_rate_bps`
 on a `recovery.credited` payload, never as its own event (design lock §2.18).
+
+**Phase 8 (spec §12.3 failure 3) adds ONE type, and only one:**
+
+    model.degraded      — the allocator's model-backed scorer became
+                          unavailable and the run fell back to the frozen
+                          Phase 4 heuristic. Spec §12.3 requires the
+                          allocator to "log a degradation event"; no
+                          existing type carries that fact, so this is the
+                          single genuinely new Phase 8 vocabulary entry.
+                          Unsigned — there is no agent behind a scorer
+                          failure, matching `agent.registered`'s and
+                          `holdout.assigned`'s existing unsigned precedent.
+
+Everything else Phase 8 renders REUSES an existing type. In particular the
+stage-two rate-ceiling denial (spec §12.3 failure 2) is a `decision.denied`
+carrying the reason code `agent.rate_ceiling_exceeded` — it IS a post-scope
+decision denial in exactly the shape `AllocationOutcome` /
+`sampark.audit.emit.event_for_decision` already handle, and neither
+validates reason codes against a closed vocabulary, so no new type and no
+change to either module is required. Chaos-panel button presses are NEVER
+audited: only their EFFECT, once it actually changes a decision, reaches
+the chain (spec §12.1 — the log is the decision record, not a UI activity
+feed).
 """
 
 from __future__ import annotations
@@ -66,6 +89,9 @@ HOLDOUT_ASSIGNED = "holdout.assigned"
 CONTACT_OPT_OUT = "contact.opt_out"
 RECOVERY_CREDITED = "recovery.credited"
 
+# --- Phase 8 addition (spec §12.3 failure 3) ---
+MODEL_DEGRADED = "model.degraded"
+
 EVENT_TYPES: frozenset[str] = frozenset(
     {
         AGENT_REGISTERED,
@@ -83,6 +109,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
         HOLDOUT_ASSIGNED,
         CONTACT_OPT_OUT,
         RECOVERY_CREDITED,
+        MODEL_DEGRADED,
     }
 )
 
@@ -91,7 +118,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
 # ones with no signed request behind them, plus holdout.assigned (Phase 7
 # — no agent behind an assignment decision).
 SIGNED_EVENT_TYPES: frozenset[str] = EVENT_TYPES - frozenset(
-    {AGENT_REGISTERED, AGENT_REVOKED, GRANT_EXPIRED, HOLDOUT_ASSIGNED}
+    {AGENT_REGISTERED, AGENT_REVOKED, GRANT_EXPIRED, HOLDOUT_ASSIGNED, MODEL_DEGRADED}
 )
 
 # Legal successor types for one request/grant's lifecycle (Phase 5A §2.2).
@@ -118,6 +145,18 @@ TERMINAL_EVENT_TYPES: frozenset[str] = frozenset(
 # (SQL-side ORDER BY) so both layers agree on the same-instant order.
 TYPE_ORDER: dict[str, int] = {
     HOLDOUT_ASSIGNED: -1,  # Phase 7 — precedes everything else at the same instant
+    # Phase 8. `model.degraded` is stamped with the window's `decision_at`,
+    # the SAME instant every decision.* event for that window carries, and it
+    # explains those decisions — so it must sort STRICTLY BEFORE them, i.e.
+    # below DECISION_DENIED/DECISION_DEFERRED's 1. It must equally stay
+    # STRICTLY ABOVE HOLDOUT_ASSIGNED's -1, because
+    # tests/audit/test_emit_phase7.py asserts holdout.assigned is the unique
+    # minimum of this mapping (a Phase 7 invariant this phase does not get to
+    # weaken). 0 is the only value satisfying both, and it shares that rank
+    # with REQUEST_RECEIVED — harmless, since same-rank same-instant events
+    # fall through to the `event_id` tiebreak both explain.py and store.py
+    # already apply.
+    MODEL_DEGRADED: 0,
     REQUEST_RECEIVED: 0,
     REQUEST_DENIED_ON_SCOPE: 1,
     DECISION_DENIED: 1,

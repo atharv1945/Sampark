@@ -1,0 +1,183 @@
+/* SAMPARK Phase 8 — spec §12.2.
+   "The bar is legible and interactive, not beautiful."
+   Four grant-state colours and no more. Denials louder than grants.
+   Monospace for anything that is a real record. Zero framework debt. */
+
+:root {
+  --bg: #0f1115;
+  --panel: #161a21;
+  --panel2: #1b2029;
+  --line: #2a313d;
+  --text: #e6e9ef;
+  --muted: #8b95a7;
+
+  /* THE FOUR STATES. One meaning each (spec §12.2). */
+  --granted: #2f9e5e;
+  --scope:   #d98520;
+  --policy:  #d64545;
+  --rolled:  #a457d6;
+  --pending: #5a6474;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+code, pre, .mono, #raw, #feed, #denials { font-family: "JetBrains Mono", Consolas, "SF Mono", Menlo, monospace; }
+
+/* ---- header ---- */
+#topbar {
+  display: flex; align-items: center; gap: 18px;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.logo { font-weight: 700; letter-spacing: .14em; font-size: 15px; }
+.tagline { color: var(--muted); font-size: 12px; margin-left: 10px; }
+.badges { display: flex; gap: 8px; margin-left: auto; }
+.badge {
+  font-size: 11px; padding: 3px 9px; border-radius: 3px;
+  background: var(--panel2); border: 1px solid var(--line); color: var(--muted);
+  font-family: Consolas, monospace;
+}
+.badge-sim { background: #3a2d10; border-color: #6b5216; color: #f0c674; font-weight: 600; }
+.controls { display: flex; gap: 8px; }
+button {
+  background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+  padding: 6px 13px; border-radius: 3px; cursor: pointer; font-size: 13px;
+}
+button:hover:not(:disabled) { border-color: #47536b; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.primary { background: #1f5f3d; border-color: #2f9e5e; }
+
+#integrity-banner {
+  flex: 0 0 auto; padding: 7px 16px; font-size: 12px; color: var(--muted);
+  background: #12161d; border-bottom: 1px solid var(--line);
+}
+#integrity-banner code { color: #9fd0ff; }
+
+/* ---- main split view ---- */
+main { flex: 1 1 auto; display: grid; grid-template-columns: 1.15fr 1fr; min-height: 0; }
+section { min-height: 0; display: flex; flex-direction: column; }
+#pane-trace { border-right: 1px solid var(--line); overflow-y: auto; padding: 12px 14px; }
+#pane-raw { overflow-y: auto; padding: 12px 14px; background: var(--panel); }
+
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .09em; color: var(--muted);
+     margin: 14px 0 7px; font-weight: 600; }
+h2:first-child { margin-top: 0; }
+.sub { text-transform: none; letter-spacing: 0; font-weight: 400; opacity: .75; margin-left: 6px; }
+.count { float: right; background: var(--policy); color: #fff; border-radius: 9px;
+         padding: 0 7px; font-size: 11px; }
+
+/* ---- pipeline ---- */
+#pipeline { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+#pipeline li {
+  font-size: 11px; padding: 5px 9px; border: 1px solid var(--line);
+  border-radius: 3px; background: var(--panel2); color: var(--muted);
+  transition: background .12s, color .12s, border-color .12s;
+}
+#pipeline li .n { opacity: .5; margin-right: 4px; }
+#pipeline li.lit { color: #fff; border-color: #4d5b73; background: #26303f; }
+#pipeline li.lit-granted { border-color: var(--granted); background: #14301f; color: #b7e8cb; }
+#pipeline li.lit-scope   { border-color: var(--scope);   background: #33260c; color: #f0cf9a; }
+#pipeline li.lit-policy  { border-color: var(--policy);  background: #341616; color: #f2b3b3; }
+#pipeline li.lit-rolled  { border-color: var(--rolled);  background: #2b1638; color: #dcb6f0; }
+
+.legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
+          margin-bottom: 6px; flex-wrap: wrap; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-left: 8px; }
+.sw:first-child { margin-left: 0; }
+.sw-granted { background: var(--granted); } .sw-scope { background: var(--scope); }
+.sw-policy { background: var(--policy); }   .sw-rolled { background: var(--rolled); }
+.sw-pending { background: var(--pending); }
+
+/* ---- event rows ---- */
+#feed, #denials { display: flex; flex-direction: column; gap: 3px; }
+.ev {
+  display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; align-items: baseline;
+  padding: 4px 8px; border-left: 3px solid var(--pending);
+  background: var(--panel2); border-radius: 0 3px 3px 0; cursor: pointer; font-size: 12px;
+}
+.ev:hover { background: #232a35; }
+.ev.sel { outline: 1px solid #5b7bb0; }
+.ev .seq { color: var(--muted); font-size: 11px; }
+.ev .rc { color: var(--muted); font-size: 11px; }
+.ev.granted { border-left-color: var(--granted); }
+.ev.scope   { border-left-color: var(--scope); }
+.ev.policy  { border-left-color: var(--policy); }
+.ev.rolled  { border-left-color: var(--rolled); }
+
+/* Denials are visually LOUDER than grants — spec §12.2. */
+#denials .ev {
+  border-left-width: 6px; padding: 7px 10px; font-size: 13px; font-weight: 500;
+  background: #211a1a;
+}
+#denials .ev.scope { background: #251d10; }
+#denials .ev .rc { color: #ffb4b4; font-size: 12px; font-weight: 600; }
+#denials .ev.scope .rc { color: #f0cf9a; }
+
+/* ---- raw pane ---- */
+#raw { background: #0c0f14; border: 1px solid var(--line); border-radius: 3px;
+       padding: 11px; font-size: 12px; white-space: pre-wrap; word-break: break-all;
+       margin: 0; color: #cfd6e2; }
+#explanation { background: #0c0f14; border: 1px solid var(--line); border-radius: 3px;
+               padding: 11px; font-size: 13px; line-height: 1.6; }
+#explanation.muted { color: var(--muted); }
+.small { font-size: 11px; color: var(--muted); white-space: pre-wrap;
+         word-break: break-all; max-height: 190px; overflow-y: auto; margin: 8px 0 0; }
+
+/* ---- footer ---- */
+footer { flex: 0 0 auto; display: grid; grid-template-columns: 1.15fr 1fr;
+         border-top: 1px solid var(--line); background: var(--panel); max-height: 30vh; }
+footer section { padding: 10px 14px; overflow-y: auto; }
+#chaos { border-left: 1px solid var(--line); }
+h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+     color: var(--muted); margin: 0 0 7px; font-weight: 600; }
+h3.ref { margin-top: 12px; }
+.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.metric-grid div { background: var(--panel2); border: 1px solid var(--line);
+                   border-radius: 3px; padding: 5px 8px; }
+.metric-grid b { display: block; font-size: 16px; font-family: Consolas, monospace; }
+.metric-grid span { font-size: 10px; color: var(--muted); }
+.ref-grid { opacity: .82; }
+.ref-grid div { border-style: dashed; }
+.src { font-size: 10px; color: var(--muted); margin: 6px 0 0; }
+
+/* The chip that marks NON-audit-derived state. */
+.chip { font-size: 10px; padding: 1px 6px; border-radius: 8px; vertical-align: middle; }
+.chip-control { background: #3a2d10; color: #f0c674; border: 1px solid #6b5216; }
+
+#chaos-list { display: flex; flex-direction: column; gap: 5px; }
+.chaos {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 3px; padding: 6px 9px;
+}
+.chaos .nm { font-size: 12px; font-weight: 600; }
+.chaos .fx { font-size: 10px; color: var(--muted); display: block; margin-top: 2px; }
+.chaos .note { font-size: 10px; color: #f0c674; display: block; margin-top: 2px; }
+.chaos button { font-size: 11px; padding: 4px 9px; }
+.chaos.fired { border-color: #3f6b4f; }
+
+#toast {
+  position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+  background: #22303f; border: 1px solid #47536b; border-radius: 4px;
+  padding: 9px 15px; font-size: 12px; max-width: 62vw; display: none; z-index: 40;
+}
+#toast.err { background: #3a1c1c; border-color: #8a3b3b; }
+#toast.show { display: block; }
+
+/* Compliance tiles. Zero is quiet; a non-zero value must be impossible to
+   miss, because "compliance held" is only a meaningful claim if its failure
+   would be loud (spec §12.3). */
+.metric-grid div.ok  { border-color: #2f6b47; }
+.metric-grid div.ok b { color: #7fd6a3; }
+.metric-grid div.bad { border-color: var(--policy); background: #341616; }
+.metric-grid div.bad b { color: #ff8f8f; }

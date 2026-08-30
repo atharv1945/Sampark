@@ -37,7 +37,7 @@ committed business action).
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Protocol
 
 import psycopg
@@ -91,6 +91,20 @@ class AuditSink(Protocol):
     ) -> None: ...
 
     def record_recovery_credited(self, credit: "Credit", request: GrantRequest, at: datetime) -> None: ...
+
+    # --- Phase 8 (spec §12.3) ---
+
+    def record_agent_struck(
+        self, agent_after_strike: Agent, reason_code: str, at: datetime, request: GrantRequest
+    ) -> None: ...
+
+    def record_agent_revoked(
+        self, agent_after_revocation: Agent, at: datetime, reason_code: str | None = None
+    ) -> None: ...
+
+    def record_model_degraded(
+        self, reason_code: str, scorer_before: str, scorer_after: str, window_id: date, at: datetime
+    ) -> None: ...
 
 
 class MissingClaimError(RuntimeError):
@@ -170,6 +184,39 @@ class PostgresAuditSink:
 
     def record_recovery_credited(self, credit: "Credit", request: GrantRequest, at: datetime) -> None:
         chain.append(self._conn, emit.event_for_recovery_credited(credit, request, at))
+
+    # --- Phase 8 (spec §12.3) ---
+    #
+    # `event_for_agent_struck` / `event_for_agent_revoked` have existed and
+    # been unit-tested since Phase 5 (U-8) but had NO caller anywhere: spec
+    # §12.3's rogue demo strikes on STAGE-TWO denials (an in-scope request
+    # refused by the rate ceiling), and that mechanism did not exist until
+    # Phase 8 built it. These three methods are the wiring, and nothing
+    # about the emitters themselves changed.
+    #
+    # `sampark.mediation.service.mediate_window` does NOT call any of them —
+    # the Phase 4 decision path is untouched by Phase 8. Their only caller
+    # is the Phase 8 demo runner (`sampark.demo.runner`), which invokes them
+    # AFTER the corresponding registry write has already been persisted
+    # (append-after-write, the same ordering `record_agent_registered` uses).
+
+    def record_agent_struck(
+        self, agent_after_strike: Agent, reason_code: str, at: datetime, request: GrantRequest
+    ) -> None:
+        chain.append(self._conn, emit.event_for_agent_struck(agent_after_strike, reason_code, at, request))
+
+    def record_agent_revoked(
+        self, agent_after_revocation: Agent, at: datetime, reason_code: str | None = None
+    ) -> None:
+        chain.append(self._conn, emit.event_for_agent_revoked(agent_after_revocation, at, reason_code))
+
+    def record_model_degraded(
+        self, reason_code: str, scorer_before: str, scorer_after: str, window_id: date, at: datetime
+    ) -> None:
+        chain.append(
+            self._conn,
+            emit.event_for_model_degraded(reason_code, scorer_before, scorer_after, window_id, at),
+        )
 
     def _lookup_grant_metadata(self, grant_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
         with self._conn.cursor() as cur:
