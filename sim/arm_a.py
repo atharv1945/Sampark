@@ -23,7 +23,7 @@ from agents.channel import MockChannelAdapter
 from agents.types import ContactAction
 from sampark.contracts import RiskItem
 from sim.cli import build_dataset
-from sim.environment import Environment
+from sim.environment import BETA_FATIGUE, BETA_INCENTIVE, Environment
 from sim.ledger import Ledger
 
 _AGENTS: tuple[RecoveryAgent, ...] = (
@@ -57,10 +57,23 @@ def _sort_key(action: ContactAction) -> tuple:
     return (action.scheduled_at, action.agent_id, action.risk_id)
 
 
-def run_arm_a(seed: int) -> tuple[ContactOutcome, ...]:
+def run_arm_a(
+    seed: int,
+    *,
+    beta_fatigue: float = BETA_FATIGUE,
+    beta_incentive: float = BETA_INCENTIVE,
+) -> tuple[ContactOutcome, ...]:
+    """`beta_fatigue` / `beta_incentive` (Phase 9, spec §11) are keyword-only
+    and default to the frozen `sim.environment` constants, so `run_arm_a(seed)`
+    — every pre-Phase-9 call site — is byte-identical. They reach nothing but
+    `Environment`'s ground-truth response model: agent action selection below
+    happens before any observation and cannot see them."""
     population, signals, ledger = build_dataset(seed)
     view = _build_ledger_view(ledger)
-    environment = Environment.build(population, signals, ledger, seed)
+    environment = Environment.build(
+        population, signals, ledger, seed,
+        beta_fatigue=beta_fatigue, beta_incentive=beta_incentive,
+    )
 
     actions: list[ContactAction] = []
     for agent in _AGENTS:

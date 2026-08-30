@@ -1,10 +1,199 @@
 # SAMPARK
 
-A mediation layer for revenue-recovery agents. See
-`SAMPARK-razorpay-buildathon-spec.md` for the full design, `CLAUDE.md`
-for engineering discipline, and `DECISIONS.md` for the build log.
+**A mediation layer for revenue-recovery agents.**
 
-This file grows one phase at a time (spec §18.0).
+> **Authorization decides whether an agent *may* act.
+> Authorization alone must not decide which of several equally-authorized agents *should* act.**
+
+---
+
+## The problem
+
+A merchant runs four AI recovery agents. All four notice Priya's failed payment.
+All four hold valid consent, an approved scope, an in-policy discount and a
+registered template. Three of them contact her; one at 9:40 PM. Two later claim
+the same recovery.
+
+**Every single one of those actions was authorized.**
+
+A permission system evaluates one request at a time and is stateless with respect
+to the others — that is what makes it fast and composable, and exactly what makes
+it blind here. It permits all four calls, correctly, one at a time. The harm is
+*emergent*: it lives in the composition, and no per-request authorizer can express
+it, because the cost of burning a customer falls on whichever agent needs her next
+week.
+
+SAMPARK is the layer that can express it, because it is the only component that
+sees every agent's demand on the same human in the same window. It does not
+replace authorization — it takes it as the floor and builds the layer above it.
+
+## The results
+
+Five precommitted seeds, one synthetic merchant month, four identical agents in
+both arms. **Arm A** = unmediated status quo. **Arm B** = SAMPARK. **Arm H** =
+nobody contacted, natural recovery only.
+
+| Metric | Arm A | Arm B | Δ |
+|---|---:|---:|---:|
+| Contacts sent | 90,080 | 46,377 | **−48.5 %** |
+| Total ₹ recovered (paise) | 8,314,405,039 | 7,633,415,148 | **−8.2 %** |
+| ₹ recovered per contact | 90,534 | 152,729 | **+68.7 %** |
+| Compliance violations (quiet hours, contact caps, interlocks) | thousands | **0** | — |
+| **Scope violations caught by the registry** | **0** | **0** | **0** |
+
+Read the second and third rows together, because they are the whole argument:
+**SAMPARK recovers less total money and it is not hiding that.** It recovers it
+with half the contacts, because customer attention is a scarce, shared,
+depletable resource that a marketplace of independently-authorized agents will
+over-consume.
+
+The last row is the **control**. It reads 0/0 and it is *expected* to: the four
+agents are correctly scoped in both arms. Every other row moves and that one does
+not — which is the cleanest available demonstration that authorization was never
+the binding constraint.
+
+*(World-v2 holdout family, f=0.10, 5 seeds — `results/phase9_abh_table.json`.
+The frozen Phase 4 gate, world v1, reports mean A 89,387.38 and mean B 156,957.37
+paise/contact, uplift range [1.7114, 1.8822], `GATE: PASS`.)*
+
+**Where the improvement actually comes from** — hard policy and contact caps
+alone buy ~1.09×; expected-value ranking buys the rest, to ~1.76×; the margin
+budget is near-inert at headline capacity; and **the ML models contribute exactly
+0.00 %**, because the uplift model is honestly unavailable on this data. That row
+reads zero and stays in the table.
+
+## Does it survive when the assumptions move?
+
+A 50-point sensitivity sweep over the two ground-truth response coefficients,
+with the grid, the metric and six predictions **committed to git before the sweep
+ran** ([`results/phase9_precommitment.json`](results/phase9_precommitment.json)).
+All six predictions passed. Three findings, one of which qualifies our own pitch:
+
+| `BETA_FATIGUE` (frozen = 1.0) | 0.0 | 0.5 | **1.0** | 1.5 | 2.0 |
+|---|---:|---:|---:|---:|---:|
+| Uplift in ₹/contact | 1.5513 | 1.6574 | **1.7559** | 1.8568 | 1.9282 |
+| Arm B ÷ Arm A total ₹ | 0.7996 | 0.8542 | **0.9050** | 0.9570 | 0.9938 |
+
+1. **SAMPARK never stops winning on ₹/contact** inside the tested range.
+2. **Most of that win is selection, not fatigue.** Switch the cross-agent fatigue
+   externality off entirely (`BETA_FATIGUE = 0`) and Arm B still wins by 1.55× —
+   about **73 %** of the advantage survives. The spec calls the fatigue term "the
+   whole thesis expressed as arithmetic"; the measurement says ranking and
+   declining low-value contacts does most of the work. We are reporting that
+   against ourselves.
+3. **The honest losing condition is total revenue** — Arm B recovers less at every
+   tested value. But the gap closes as fatigue worsens, reaching **99.4 %** of Arm
+   A's revenue on half the contacts. **Mediation is most valuable exactly where
+   customer attention is most fragile.**
+
+## Quickstart
+
+Requires Docker, and Python **3.11** (pinned; `tests/test_environment.py` fails
+loudly on anything else).
+
+```bash
+# 1. infrastructure — PostgreSQL 16 + Redis
+cp .env.example .env          # then fill in POSTGRES_* values
+docker compose up -d
+
+# 2. schema (hand-authored, applied explicitly — never on container start)
+psql "$DATABASE_URL" -f sampark/schema.sql
+
+# 3. dependencies
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+```
+
+**Reproduce the headline in seconds** (these read committed evidence; they run no
+simulation):
+
+```bash
+python -m sim.gate              # → GATE (mean B ₹/contact > mean A ₹/contact): PASS
+python -m sampark.audit.verify  # → VALID: True   (560 events, chain intact)
+python -m sim.abh_table         # → rebuilds the A/B/H table from committed evidence
+```
+
+**Watch the system make decisions live:**
+
+```bash
+uvicorn ui.app:app --host 127.0.0.1 --port 8000
+# open http://127.0.0.1:8000 and press "Run replay"
+```
+
+One hands-off ~40-second replay produces all three failure modes with no input:
+a provider timeout that rolls back, a two-stage rogue agent that gets struck and
+revoked, and a model degradation that falls back to the deterministic heuristic.
+The chaos panel lets you trigger seven more on demand.
+
+**Re-run the experiments yourself** (minutes to ~80 minutes; no database needed):
+
+```bash
+python -m sim.sensitivity --dimension all   # the §11 sensitivity sweep, ~80 min
+python -m pytest -q --ignore=tests/sim_arm_b_holdout   # fast suite, ~6 min
+python -m pytest                                        # everything, ~1h45m
+```
+
+## Where AI is used — and where it deliberately is not
+
+**Used:** a fatigue-hazard model and an uplift T-learner behind a model-agnostic
+scoring seam; an LLM that turns English policy into an **intermediate
+representation**, which deterministic code then validates, compiles, and
+**generates a pytest case for** — a rule activates only if its own generated test
+passes; and a read-only LLM explanation of the audit log.
+
+**Deliberately not used:** root-cause classification was an LLM call and **it was
+cut** for a YAML lookup table, because a dictionary is correct and a model is
+probabilistic. Allocation is a greedy heuristic with a **published optimality
+gap** (within ~0.04 % of a measured per-window optimum), not a solver nobody can
+defend under questioning.
+
+**Never LLM-driven:** signature verification, scope checks, compliance filtering,
+budget arithmetic, contact counting, margin calculation, the allocation decision,
+transactional issuance, attribution arithmetic, audit hashing.
+
+> **A model that can hallucinate must never sit on the path to a money action.**
+
+## Honest limitations, up front
+
+- **It is a simulation.** Synthetic data, a hand-specified response process, and
+  mocked channels — you cannot lawfully contact real numbers on synthetic consent.
+- **The ML did not work.** The uplift model is structurally unavailable on this
+  data and its measured contribution is zero. Nothing here claims otherwise.
+- **The live LLM compiler leg was never exercised** (no API key configured); the
+  committed fidelity number measures the deterministic pipeline.
+- **The allocator trusts agent-declared risk amounts** — a self-interested agent
+  could win every grant by overstating. Flagged, not fixed.
+- **Contact-cap sensitivity could not be tested** because those constants live in
+  protected Phase 4 files.
+
+The complete record is in **[`DISCLAIMER.md`](DISCLAIMER.md)**, which separates
+*demonstrated by evidence* from *architectural capability* from *not validated*.
+
+## Where to look
+
+| Document | What it answers |
+|---|---|
+| **[`ARCHITECTURE.md`](ARCHITECTURE.md)** | How the system works, end to end, with the AI boundaries drawn explicitly |
+| **[`DISCLAIMER.md`](DISCLAIMER.md)** | What this cannot honestly claim |
+| **[`DECISIONS.md`](DECISIONS.md)** | The build log — what broke, and what was done about it |
+| [`results/phase9_metrics_table.md`](results/phase9_metrics_table.md) | The full A/B/H table and the sensitivity sweep, human-readable |
+| [`results/phase9_precommitment.json`](results/phase9_precommitment.json) | Sweep predictions, committed to git *before* the sweep ran |
+| `SAMPARK-razorpay-buildathon-spec.md` | The original design specification |
+| `CLAUDE.md` | Engineering discipline for this repository |
+
+Three tests are worth reading on their own:
+`tests/test_concurrent_grant_issuance.py` (50 agents race for the last contact
+slot; exactly one wins — and a negative control proves the test can fail),
+`tests/test_scope_enforcement.py` (an out-of-scope request is rejected on
+signature-verified scope alone, with **no allocator involvement**), and
+`tests/test_ui_renders_only_audit_events.py` (the UI renders the audit log and
+nothing else — enforced, not asserted).
+
+---
+
+## Build log
+
+The sections below were written one phase at a time as the project was built
+(spec §18.0), and are left as they were written.
 
 ## Phase 0 — Foundations & Contracts
 
@@ -64,7 +253,7 @@ tests).
 - `agents/{payment_retry,cart_recovery,mandate_recovery,receivables}.py`
   — four thin, genuinely unmediated agents (zero import of
   `sampark.registry`/`allocator`/`budget`/`policy`, mechanically enforced
-  by `tests/agents/test_hidden_response_isolation.py`).
+  by `tests/sim_environment/test_hidden_response_isolation.py`).
 - `sim/environment.py` — the sole outcome authority; agents never see
   `HiddenResponseProfile`.
 - `recovery_unit = "risk_item"` is stamped explicitly in the metrics
@@ -485,8 +674,9 @@ to LF, and the two missing gate summaries were generated by pure read of
 already-existing result files (no re-run). 45 files staged; see
 `CLAUDE.md` §15 for commit status.
 
-### Test suite (current, superseding the Phase 4/5 counts reported in
-their own sections above)
+### Test suite (as of Phase 6, superseding the Phase 4/5 counts reported in
+their own sections above; later phases add to it — see the Phase 8 and
+Phase 9 sections for the counts at those points)
 
 Full repository suite with Postgres configured, CI's `postgres:16`
 service now applied, and the U-1 audit migration folded into

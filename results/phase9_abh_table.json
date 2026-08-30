@@ -1,0 +1,1312 @@
+{
+  "phase": 9,
+  "artifact": "canonical A/B/H table",
+  "constants_commit_sha": "eabdbd16140e7a0b06de8c5cc343682b427c6e0f",
+  "generated_from": "committed results/*.json only \u2014 no experiment was re-run",
+  "headline_cell": {
+    "seed": 42,
+    "fraction": 0.1
+  },
+  "headline": {
+    "seed": 42,
+    "fraction": 0.1,
+    "world": "v2",
+    "holdout_customer_count": 490,
+    "holdout_customer_set_sha256": "f0269581cdfd3749736d743318e69083ed9d862f633627bf5ec8647b0c046770",
+    "arms": {
+      "A-H": {
+        "label": "unmediated status quo, with holdout",
+        "backend": "in-process (no mediation ledger)",
+        "contacts": {
+          "value": 18038,
+          "provenance": "observed"
+        },
+        "recoveries": {
+          "value": 4186,
+          "provenance": "observed"
+        },
+        "contacted_recovered_paise": {
+          "value": 1609423614,
+          "provenance": "observed"
+        },
+        "natural_recovered_paise": {
+          "value": 31947441,
+          "n_items": 1962,
+          "provenance": "observed",
+          "note": "the uncontacted set here is EXACTLY the randomized holdout"
+        },
+        "total_recovered_paise": {
+          "value": 1641371055,
+          "provenance": "observed"
+        },
+        "incentive_spend_paise": {
+          "value": 24649466,
+          "provenance": "observed"
+        },
+        "per_contact_paise": {
+          "value": 89224.06109324758,
+          "provenance": "observed"
+        },
+        "opt_out": {
+          "opted_out_count": 621,
+          "contacts": 18038,
+          "rate": 0.03442732010200687,
+          "wilson_ci_95": [
+            0.03186412857412872,
+            0.03718877786531148
+          ],
+          "provenance": "observed"
+        }
+      },
+      "B-H": {
+        "label": "SAMPARK mediated, with holdout",
+        "backend": "memory",
+        "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+        "contacts": {
+          "value": 9267,
+          "provenance": "observed"
+        },
+        "recoveries": {
+          "value": 2415,
+          "provenance": "observed"
+        },
+        "contacted_recovered_paise": {
+          "value": 1384918633,
+          "provenance": "observed"
+        },
+        "natural_recovered_paise": {
+          "value": 101893447,
+          "n_items": 10733,
+          "provenance": "observed",
+          "WARNING": "NOT a natural-recovery baseline. This pool is a MIXTURE: the randomized holdout (1962 items) PLUS every allocator-declined item (8771 items). Declined items were selected ON LOW EXPECTED VALUE by the allocator itself, so this pool's per-item rate is biased low BY the allocator's own selection skill. Only the randomized part is a valid control, and sampark/attribution/baseline.py uses only that part."
+        },
+        "total_recovered_paise": {
+          "value": 1486812080,
+          "provenance": "observed"
+        },
+        "incentive_spend_paise": {
+          "value": 16805011,
+          "provenance": "observed"
+        },
+        "per_contact_paise": {
+          "value": 149446.2752778677,
+          "provenance": "observed"
+        },
+        "opt_out": {
+          "opted_out_count": 195,
+          "contacts": 9267,
+          "rate": 0.021042408546455164,
+          "wilson_ci_95": [
+            0.018312506788294103,
+            0.024169245893145307
+          ],
+          "provenance": "observed"
+        }
+      },
+      "H": {
+        "label": "full population, zero contact",
+        "contacts": {
+          "value": 0,
+          "provenance": "observed"
+        },
+        "recoveries": {
+          "value": 1057,
+          "provenance": "ground_truth"
+        },
+        "natural_recovered_paise": {
+          "value": 310267323,
+          "provenance": "ground_truth"
+        },
+        "n_items": 20000,
+        "per_item_paise": {
+          "value": 15513.36615,
+          "provenance": "ground_truth"
+        },
+        "role": "validates the holdout estimator; NEVER feeds the attribution ledger"
+      }
+    },
+    "deltas_B_vs_A": {
+      "contacts_pct": -48.62512473666703,
+      "total_recovered_pct": -9.416455500977504,
+      "per_contact_pct": 67.4954865836943,
+      "incentive_spend_pct": -31.824036269183274,
+      "per_contact_ratio": 1.674954865836943,
+      "note": "both arms are world v2 \u2014 this delta is within-family and therefore valid"
+    },
+    "holdout_validity": {
+      "seed": 42,
+      "fraction": 0.1,
+      "holdout_estimate": {
+        "rate": 0.0509683995922528,
+        "n": 1962,
+        "recoveries": 100,
+        "wilson_ci_95": [
+          0.042083986882282404,
+          0.06160778563896244
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.05285,
+        "n": 20000,
+        "recoveries": 1057,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    }
+  },
+  "per_seed_f10": [
+    {
+      "seed": 7,
+      "fraction": 0.1,
+      "world": "v2",
+      "holdout_customer_count": 490,
+      "holdout_customer_set_sha256": "ccb0f30b839435bdee502427c12d3bf017ac5ad7c12bc172f3d5e7fd7d1b0ff2",
+      "arms": {
+        "A-H": {
+          "label": "unmediated status quo, with holdout",
+          "backend": "in-process (no mediation ledger)",
+          "contacts": {
+            "value": 18014,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 4228,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1649578412,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 27789735,
+            "n_items": 1986,
+            "provenance": "observed",
+            "note": "the uncontacted set here is EXACTLY the randomized holdout"
+          },
+          "total_recovered_paise": {
+            "value": 1677368147,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 24286848,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 91572.02242700123,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 641,
+            "contacts": 18014,
+            "rate": 0.03558343510602865,
+            "wilson_ci_95": [
+              0.0329756813537281,
+              0.03838922619435469
+            ],
+            "provenance": "observed"
+          }
+        },
+        "B-H": {
+          "label": "SAMPARK mediated, with holdout",
+          "backend": "memory",
+          "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+          "contacts": {
+            "value": 9316,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 2406,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1425398260,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 113717821,
+            "n_items": 10684,
+            "provenance": "observed",
+            "WARNING": "NOT a natural-recovery baseline. This pool is a MIXTURE: the randomized holdout (1986 items) PLUS every allocator-declined item (8698 items). Declined items were selected ON LOW EXPECTED VALUE by the allocator itself, so this pool's per-item rate is biased low BY the allocator's own selection skill. Only the randomized part is a valid control, and sampark/attribution/baseline.py uses only that part."
+          },
+          "total_recovered_paise": {
+            "value": 1539116081,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 16226399,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 153005.3950193216,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 210,
+            "contacts": 9316,
+            "rate": 0.02254186346071275,
+            "wilson_ci_95": [
+              0.01971857968754497,
+              0.025758759755649004
+            ],
+            "provenance": "observed"
+          }
+        },
+        "H": {
+          "label": "full population, zero contact",
+          "contacts": {
+            "value": 0,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 1050,
+            "provenance": "ground_truth"
+          },
+          "natural_recovered_paise": {
+            "value": 308558507,
+            "provenance": "ground_truth"
+          },
+          "n_items": 20000,
+          "per_item_paise": {
+            "value": 15427.92535,
+            "provenance": "ground_truth"
+          },
+          "role": "validates the holdout estimator; NEVER feeds the attribution ledger"
+        }
+      },
+      "deltas_B_vs_A": {
+        "contacts_pct": -48.28466748084823,
+        "total_recovered_pct": -8.242201704334617,
+        "per_contact_pct": 67.08749131460256,
+        "incentive_spend_pct": -33.18853479875198,
+        "per_contact_ratio": 1.6708749131460257,
+        "note": "both arms are world v2 \u2014 this delta is within-family and therefore valid"
+      },
+      "holdout_validity": {
+        "seed": 7,
+        "fraction": 0.1,
+        "holdout_estimate": {
+          "rate": 0.0473313192346425,
+          "n": 1986,
+          "recoveries": 94,
+          "wilson_ci_95": [
+            0.038834181001084926,
+            0.05757630715033376
+          ],
+          "provenance": "estimated",
+          "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+        },
+        "arm_h_ground_truth": {
+          "rate": 0.0525,
+          "n": 20000,
+          "recoveries": 1050,
+          "provenance": "ground_truth",
+          "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+        },
+        "arm_h_within_holdout_ci": true,
+        "ci_method": "Wilson score interval, z=1.96"
+      }
+    },
+    {
+      "seed": 42,
+      "fraction": 0.1,
+      "world": "v2",
+      "holdout_customer_count": 490,
+      "holdout_customer_set_sha256": "f0269581cdfd3749736d743318e69083ed9d862f633627bf5ec8647b0c046770",
+      "arms": {
+        "A-H": {
+          "label": "unmediated status quo, with holdout",
+          "backend": "in-process (no mediation ledger)",
+          "contacts": {
+            "value": 18038,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 4186,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1609423614,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 31947441,
+            "n_items": 1962,
+            "provenance": "observed",
+            "note": "the uncontacted set here is EXACTLY the randomized holdout"
+          },
+          "total_recovered_paise": {
+            "value": 1641371055,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 24649466,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 89224.06109324758,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 621,
+            "contacts": 18038,
+            "rate": 0.03442732010200687,
+            "wilson_ci_95": [
+              0.03186412857412872,
+              0.03718877786531148
+            ],
+            "provenance": "observed"
+          }
+        },
+        "B-H": {
+          "label": "SAMPARK mediated, with holdout",
+          "backend": "memory",
+          "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+          "contacts": {
+            "value": 9267,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 2415,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1384918633,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 101893447,
+            "n_items": 10733,
+            "provenance": "observed",
+            "WARNING": "NOT a natural-recovery baseline. This pool is a MIXTURE: the randomized holdout (1962 items) PLUS every allocator-declined item (8771 items). Declined items were selected ON LOW EXPECTED VALUE by the allocator itself, so this pool's per-item rate is biased low BY the allocator's own selection skill. Only the randomized part is a valid control, and sampark/attribution/baseline.py uses only that part."
+          },
+          "total_recovered_paise": {
+            "value": 1486812080,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 16805011,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 149446.2752778677,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 195,
+            "contacts": 9267,
+            "rate": 0.021042408546455164,
+            "wilson_ci_95": [
+              0.018312506788294103,
+              0.024169245893145307
+            ],
+            "provenance": "observed"
+          }
+        },
+        "H": {
+          "label": "full population, zero contact",
+          "contacts": {
+            "value": 0,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 1057,
+            "provenance": "ground_truth"
+          },
+          "natural_recovered_paise": {
+            "value": 310267323,
+            "provenance": "ground_truth"
+          },
+          "n_items": 20000,
+          "per_item_paise": {
+            "value": 15513.36615,
+            "provenance": "ground_truth"
+          },
+          "role": "validates the holdout estimator; NEVER feeds the attribution ledger"
+        }
+      },
+      "deltas_B_vs_A": {
+        "contacts_pct": -48.62512473666703,
+        "total_recovered_pct": -9.416455500977504,
+        "per_contact_pct": 67.4954865836943,
+        "incentive_spend_pct": -31.824036269183274,
+        "per_contact_ratio": 1.674954865836943,
+        "note": "both arms are world v2 \u2014 this delta is within-family and therefore valid"
+      },
+      "holdout_validity": {
+        "seed": 42,
+        "fraction": 0.1,
+        "holdout_estimate": {
+          "rate": 0.0509683995922528,
+          "n": 1962,
+          "recoveries": 100,
+          "wilson_ci_95": [
+            0.042083986882282404,
+            0.06160778563896244
+          ],
+          "provenance": "estimated",
+          "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+        },
+        "arm_h_ground_truth": {
+          "rate": 0.05285,
+          "n": 20000,
+          "recoveries": 1057,
+          "provenance": "ground_truth",
+          "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+        },
+        "arm_h_within_holdout_ci": true,
+        "ci_method": "Wilson score interval, z=1.96"
+      }
+    },
+    {
+      "seed": 101,
+      "fraction": 0.1,
+      "world": "v2",
+      "holdout_customer_count": 490,
+      "holdout_customer_set_sha256": "d902ab64fd3de2868434cc789e9d499379533f5247959c7bb352ea9a0444ce18",
+      "arms": {
+        "A-H": {
+          "label": "unmediated status quo, with holdout",
+          "backend": "in-process (no mediation ledger)",
+          "contacts": {
+            "value": 18022,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 4081,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1563744659,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 34575368,
+            "n_items": 1978,
+            "provenance": "observed",
+            "note": "the uncontacted set here is EXACTLY the randomized holdout"
+          },
+          "total_recovered_paise": {
+            "value": 1598320027,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 22170930,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 86768.6527022528,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 647,
+            "contacts": 18022,
+            "rate": 0.03590056597491954,
+            "wilson_ci_95": [
+              0.03328173470440145,
+              0.038717211519557385
+            ],
+            "provenance": "observed"
+          }
+        },
+        "B-H": {
+          "label": "SAMPARK mediated, with holdout",
+          "backend": "memory",
+          "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+          "contacts": {
+            "value": 9305,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 2317,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1411247975,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 110143374,
+            "n_items": 10695,
+            "provenance": "observed",
+            "WARNING": "NOT a natural-recovery baseline. This pool is a MIXTURE: the randomized holdout (1978 items) PLUS every allocator-declined item (8717 items). Declined items were selected ON LOW EXPECTED VALUE by the allocator itself, so this pool's per-item rate is biased low BY the allocator's own selection skill. Only the randomized part is a valid control, and sampark/attribution/baseline.py uses only that part."
+          },
+          "total_recovered_paise": {
+            "value": 1521391349,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 14865587,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 151665.55346587856,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 226,
+            "contacts": 9305,
+            "rate": 0.02428801719505642,
+            "wilson_ci_95": [
+              0.021350911402357026,
+              0.027617759414858296
+            ],
+            "provenance": "observed"
+          }
+        },
+        "H": {
+          "label": "full population, zero contact",
+          "contacts": {
+            "value": 0,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 1095,
+            "provenance": "ground_truth"
+          },
+          "natural_recovered_paise": {
+            "value": 331854065,
+            "provenance": "ground_truth"
+          },
+          "n_items": 20000,
+          "per_item_paise": {
+            "value": 16592.70325,
+            "provenance": "ground_truth"
+          },
+          "role": "validates the holdout estimator; NEVER feeds the attribution ledger"
+        }
+      },
+      "deltas_B_vs_A": {
+        "contacts_pct": -48.368660526023746,
+        "total_recovered_pct": -4.813096044625861,
+        "per_contact_pct": 74.79302575587971,
+        "incentive_spend_pct": -32.95009726700684,
+        "per_contact_ratio": 1.7479302575587972,
+        "note": "both arms are world v2 \u2014 this delta is within-family and therefore valid"
+      },
+      "holdout_validity": {
+        "seed": 101,
+        "fraction": 0.1,
+        "holdout_estimate": {
+          "rate": 0.054600606673407485,
+          "n": 1978,
+          "recoveries": 108,
+          "wilson_ci_95": [
+            0.04542383127123567,
+            0.06550410565369316
+          ],
+          "provenance": "estimated",
+          "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+        },
+        "arm_h_ground_truth": {
+          "rate": 0.05475,
+          "n": 20000,
+          "recoveries": 1095,
+          "provenance": "ground_truth",
+          "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+        },
+        "arm_h_within_holdout_ci": true,
+        "ci_method": "Wilson score interval, z=1.96"
+      }
+    },
+    {
+      "seed": 2024,
+      "fraction": 0.1,
+      "world": "v2",
+      "holdout_customer_count": 489,
+      "holdout_customer_set_sha256": "2ebf98e794a913813623a259387b7c51d585f61fb29e27546e8893c2163fb27e",
+      "arms": {
+        "A-H": {
+          "label": "unmediated status quo, with holdout",
+          "backend": "in-process (no mediation ledger)",
+          "contacts": {
+            "value": 18002,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 4277,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1662937015,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 39570613,
+            "n_items": 1998,
+            "provenance": "observed",
+            "note": "the uncontacted set here is EXACTLY the randomized holdout"
+          },
+          "total_recovered_paise": {
+            "value": 1702507628,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 22769706,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 92375.1258193534,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 600,
+            "contacts": 18002,
+            "rate": 0.03332963004110654,
+            "wilson_ci_95": [
+              0.03080548005058803,
+              0.03605291106177186
+            ],
+            "provenance": "observed"
+          }
+        },
+        "B-H": {
+          "label": "SAMPARK mediated, with holdout",
+          "backend": "memory",
+          "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+          "contacts": {
+            "value": 9280,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 2388,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1451446278,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 111631764,
+            "n_items": 10720,
+            "provenance": "observed",
+            "WARNING": "NOT a natural-recovery baseline. This pool is a MIXTURE: the randomized holdout (1998 items) PLUS every allocator-declined item (8722 items). Declined items were selected ON LOW EXPECTED VALUE by the allocator itself, so this pool's per-item rate is biased low BY the allocator's own selection skill. Only the randomized part is a valid control, and sampark/attribution/baseline.py uses only that part."
+          },
+          "total_recovered_paise": {
+            "value": 1563078042,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 14342691,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 156405.8489224138,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 197,
+            "contacts": 9280,
+            "rate": 0.02122844827586207,
+            "wilson_ci_95": [
+              0.0184876867663212,
+              0.024365435587683625
+            ],
+            "provenance": "observed"
+          }
+        },
+        "H": {
+          "label": "full population, zero contact",
+          "contacts": {
+            "value": 0,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 1058,
+            "provenance": "ground_truth"
+          },
+          "natural_recovered_paise": {
+            "value": 320086260,
+            "provenance": "ground_truth"
+          },
+          "n_items": 20000,
+          "per_item_paise": {
+            "value": 16004.313,
+            "provenance": "ground_truth"
+          },
+          "role": "validates the holdout estimator; NEVER feeds the attribution ledger"
+        }
+      },
+      "deltas_B_vs_A": {
+        "contacts_pct": -48.45017220308855,
+        "total_recovered_pct": -8.18965998782591,
+        "per_contact_pct": 69.31597931273984,
+        "incentive_spend_pct": -37.009766397510795,
+        "per_contact_ratio": 1.6931597931273983,
+        "note": "both arms are world v2 \u2014 this delta is within-family and therefore valid"
+      },
+      "holdout_validity": {
+        "seed": 2024,
+        "fraction": 0.1,
+        "holdout_estimate": {
+          "rate": 0.05455455455455455,
+          "n": 1998,
+          "recoveries": 109,
+          "wilson_ci_95": [
+            0.04542382507105583,
+            0.06539493301649714
+          ],
+          "provenance": "estimated",
+          "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+        },
+        "arm_h_ground_truth": {
+          "rate": 0.0529,
+          "n": 20000,
+          "recoveries": 1058,
+          "provenance": "ground_truth",
+          "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+        },
+        "arm_h_within_holdout_ci": true,
+        "ci_method": "Wilson score interval, z=1.96"
+      }
+    },
+    {
+      "seed": 31337,
+      "fraction": 0.1,
+      "world": "v2",
+      "holdout_customer_count": 490,
+      "holdout_customer_set_sha256": "5070e93f744a2a1929dbfb7539d70d6115e753ede7258a95cfc5cb88c5808396",
+      "arms": {
+        "A-H": {
+          "label": "unmediated status quo, with holdout",
+          "backend": "in-process (no mediation ledger)",
+          "contacts": {
+            "value": 18004,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 4290,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1669490034,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 25348148,
+            "n_items": 1996,
+            "provenance": "observed",
+            "note": "the uncontacted set here is EXACTLY the randomized holdout"
+          },
+          "total_recovered_paise": {
+            "value": 1694838182,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 24353495,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 92728.83992446124,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 661,
+            "contacts": 18004,
+            "rate": 0.036714063541435235,
+            "wilson_ci_95": [
+              0.03406436884908036,
+              0.03956142315033394
+            ],
+            "provenance": "observed"
+          }
+        },
+        "B-H": {
+          "label": "SAMPARK mediated, with holdout",
+          "backend": "memory",
+          "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+          "contacts": {
+            "value": 9209,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 2413,
+            "provenance": "observed"
+          },
+          "contacted_recovered_paise": {
+            "value": 1410078747,
+            "provenance": "observed"
+          },
+          "natural_recovered_paise": {
+            "value": 112938849,
+            "n_items": 10791,
+            "provenance": "observed",
+            "WARNING": "NOT a natural-recovery baseline. This pool is a MIXTURE: the randomized holdout (1996 items) PLUS every allocator-declined item (8795 items). Declined items were selected ON LOW EXPECTED VALUE by the allocator itself, so this pool's per-item rate is biased low BY the allocator's own selection skill. Only the randomized part is a valid control, and sampark/attribution/baseline.py uses only that part."
+          },
+          "total_recovered_paise": {
+            "value": 1523017596,
+            "provenance": "observed"
+          },
+          "incentive_spend_paise": {
+            "value": 14649682,
+            "provenance": "observed"
+          },
+          "per_contact_paise": {
+            "value": 153119.63807145183,
+            "provenance": "observed"
+          },
+          "opt_out": {
+            "opted_out_count": 228,
+            "contacts": 9209,
+            "rate": 0.02475838853295689,
+            "wilson_ci_95": [
+              0.02177732672451978,
+              0.028135785859549834
+            ],
+            "provenance": "observed"
+          }
+        },
+        "H": {
+          "label": "full population, zero contact",
+          "contacts": {
+            "value": 0,
+            "provenance": "observed"
+          },
+          "recoveries": {
+            "value": 1080,
+            "provenance": "ground_truth"
+          },
+          "natural_recovered_paise": {
+            "value": 331600271,
+            "provenance": "ground_truth"
+          },
+          "n_items": 20000,
+          "per_item_paise": {
+            "value": 16580.01355,
+            "provenance": "ground_truth"
+          },
+          "role": "validates the holdout estimator; NEVER feeds the attribution ledger"
+        }
+      },
+      "deltas_B_vs_A": {
+        "contacts_pct": -48.85025549877805,
+        "total_recovered_pct": -10.137875569763391,
+        "per_contact_pct": 65.12623062704779,
+        "incentive_spend_pct": -39.845668968663425,
+        "per_contact_ratio": 1.6512623062704779,
+        "note": "both arms are world v2 \u2014 this delta is within-family and therefore valid"
+      },
+      "holdout_validity": {
+        "seed": 31337,
+        "fraction": 0.1,
+        "holdout_estimate": {
+          "rate": 0.04458917835671343,
+          "n": 1996,
+          "recoveries": 89,
+          "wilson_ci_95": [
+            0.036375559481454975,
+            0.05455244201626365
+          ],
+          "provenance": "estimated",
+          "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+        },
+        "arm_h_ground_truth": {
+          "rate": 0.054,
+          "n": 20000,
+          "recoveries": 1080,
+          "provenance": "ground_truth",
+          "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+        },
+        "arm_h_within_holdout_ci": true,
+        "ci_method": "Wilson score interval, z=1.96"
+      }
+    }
+  ],
+  "aggregate_f10": {
+    "n_seeds": 5,
+    "seeds": [
+      7,
+      42,
+      101,
+      2024,
+      31337
+    ],
+    "total_a_contacts": 90080,
+    "total_b_contacts": 46377,
+    "total_a_recovered_paise": 8314405039,
+    "total_b_recovered_paise": 7633415148,
+    "total_a_incentive_paise": 118230445,
+    "total_b_incentive_paise": 76889370,
+    "mean_a_per_contact_paise": 90533.74039326324,
+    "mean_b_per_contact_paise": 152728.54215138667,
+    "per_contact_ratio": 1.6869792575448639,
+    "contacts_delta_pct": -48.51576376554174,
+    "total_recovered_delta_pct": -8.1904825156546
+  },
+  "interference_measurement": {
+    "note": "The merchant margin budget is deliberately NOT scaled by (1 - fraction) (Phase 7 Decision 3), so holding out more customers frees capacity for the rest. This is a genuine SUTVA violation, inherent to mediating a SHARED budget: it cannot be designed away without destroying the mechanism under study. Phase 7 chose to MEASURE it by running two fractions rather than assume it away.",
+    "cells": [
+      {
+        "seed": 7,
+        "fraction": 0.1,
+        "b_h_contacts": 9316,
+        "b_h_per_contact_paise": 153005.3950193216,
+        "a_h_contacts": 18014,
+        "a_h_per_contact_paise": 91572.02242700123
+      },
+      {
+        "seed": 42,
+        "fraction": 0.1,
+        "b_h_contacts": 9267,
+        "b_h_per_contact_paise": 149446.2752778677,
+        "a_h_contacts": 18038,
+        "a_h_per_contact_paise": 89224.06109324758
+      },
+      {
+        "seed": 42,
+        "fraction": 0.2,
+        "b_h_contacts": 8200,
+        "b_h_per_contact_paise": 157235.97024390244,
+        "a_h_contacts": 16056,
+        "a_h_per_contact_paise": 88003.83308420528
+      },
+      {
+        "seed": 101,
+        "fraction": 0.1,
+        "b_h_contacts": 9305,
+        "b_h_per_contact_paise": 151665.55346587856,
+        "a_h_contacts": 18022,
+        "a_h_per_contact_paise": 86768.6527022528
+      },
+      {
+        "seed": 2024,
+        "fraction": 0.1,
+        "b_h_contacts": 9280,
+        "b_h_per_contact_paise": 156405.8489224138,
+        "a_h_contacts": 18002,
+        "a_h_per_contact_paise": 92375.1258193534
+      },
+      {
+        "seed": 31337,
+        "fraction": 0.1,
+        "b_h_contacts": 9209,
+        "b_h_per_contact_paise": 153119.63807145183,
+        "a_h_contacts": 18004,
+        "a_h_per_contact_paise": 92728.83992446124
+      }
+    ]
+  },
+  "attribution": {
+    "seed": 42,
+    "fraction": 0.1,
+    "n_credits": {
+      "value": 18038,
+      "provenance": "observed"
+    },
+    "total_observed_recovered_paise": {
+      "value": 1609423614,
+      "provenance": "observed"
+    },
+    "total_expected_natural_paise": {
+      "value": 269069392,
+      "provenance": "estimated",
+      "note": "estimated from the randomized holdout ONLY \u2014 never from Arm H, never from an allocator-declined item"
+    },
+    "total_credited_recovery_paise": {
+      "value": 1340354222,
+      "provenance": "attributed",
+      "definition": "credited = observed - expected_natural, per grant, summed"
+    },
+    "n_negative_credits": {
+      "value": 13852,
+      "provenance": "observed"
+    },
+    "negative_tail_paise": {
+      "value": -207579256,
+      "provenance": "attributed",
+      "note": "Credits are NEVER clamped at zero. An item that did not recover still consumed a contact against a positive natural baseline; clamping would bias the aggregate upward by exactly this tail."
+    },
+    "baseline_level_distribution": {
+      "source_root_cause": 16532,
+      "source": 1506
+    },
+    "arithmetic_check_passes": true,
+    "aggregate_identity_holds": true,
+    "double_attributed_recoveries": {
+      "value": 0,
+      "provenance": "observed",
+      "note": "Zero BY CONSTRUCTION, not by measurement: credit_id = uuid5(NS_ATTRIBUTION, grant_id) makes the id itself the idempotency key, and recovery_unit is the RiskItem, which Environment.observe enforces exactly-once via DuplicateObservationError."
+    }
+  },
+  "model_availability": {
+    "uplift_model": {
+      "implemented": true,
+      "available_on_this_dataset": false,
+      "per_cell": {
+        "7_f10": false,
+        "7_f20": false,
+        "42_f10": false,
+        "42_f20": false,
+        "101_f10": false,
+        "101_f20": false,
+        "2024_f10": false,
+        "2024_f20": false,
+        "31337_f10": false,
+        "31337_f20": false
+      },
+      "reason_unavailable": "No untreated control population exists per (source, root_cause) bucket at the required floor \u2014 structural, and it does not clear even at holdout fraction 0.40."
+    },
+    "fatigue_hazard_model": {
+      "implemented": true,
+      "available_on_this_dataset": true,
+      "per_cell": {
+        "7_f10": true,
+        "7_f20": true,
+        "42_f10": true,
+        "42_f20": true,
+        "101_f10": true,
+        "101_f20": true,
+        "2024_f10": true,
+        "2024_f20": true,
+        "31337_f10": true,
+        "31337_f20": true
+      },
+      "note": "Available at every cell \u2014 the only model to clear its own adequacy gate. It still does NOT reach a decision, because sampark/models/scorer.py's build_scorer() gate is all-or-nothing (uplift AND fatigue), and that gate was deliberately NOT loosened after observing which half passed."
+    },
+    "scorer_actually_used_in_every_committed_run": "HeuristicScorer",
+    "measured_model_contribution_to_headline": {
+      "value_pct": 0.0,
+      "evidence": [
+        "results/gate_phase6_heuristic.json",
+        "results/gate_phase6_model.json",
+        "results/arm_b_phase7_model_metrics_42.json"
+      ],
+      "note": "phase6_model and phase7_model reproduce the heuristic headline BIT-FOR-BIT because build_scorer() falls back deterministically. The row reads exactly zero and is reported rather than omitted."
+    },
+    "degradation_behaviour": "Three distinct causes \u2014 artifact missing/corrupt, artifact present but invalid (what actually happens here), and operator kill (Phase 8 chaos control) \u2014 converge on the SAME deterministic HeuristicScorer, decided once at construction, never per-candidate."
+  },
+  "mechanism_decomposition": {
+    "world": "v1",
+    "family_note": "world-v1 ablation family; NOT differenced against the world-v2 A/B/H table",
+    "seeds": [
+      7,
+      42,
+      101,
+      2024,
+      31337
+    ],
+    "constants_commit_sha": "aa87123aafdc9d812f5a01c04766c60b9198a2ce",
+    "rows": [
+      {
+        "configuration": "Arm A (unmediated)",
+        "switched_off": "everything",
+        "mean_per_contact_paise": 89387.38057,
+        "uplift_vs_a": 1.0,
+        "contacts": 100000
+      },
+      {
+        "configuration": "fifo_under_cap",
+        "mean_per_contact_paise": 97811.76994157316,
+        "uplift_vs_a": 1.0942458467610645,
+        "contacts": 84605,
+        "total_recovered_paise": 8275197233,
+        "gate_passed": true
+      },
+      {
+        "configuration": "aging_zero",
+        "mean_per_contact_paise": 152760.7024347492,
+        "uplift_vs_a": 1.7089739229478935,
+        "contacts": 51481,
+        "total_recovered_paise": 7863981305,
+        "gate_passed": true
+      },
+      {
+        "configuration": "headline",
+        "mean_per_contact_paise": 156957.36981923878,
+        "uplift_vs_a": 1.7559231383486416,
+        "contacts": 51542,
+        "total_recovered_paise": 8089920774,
+        "gate_passed": true
+      },
+      {
+        "configuration": "merchant_margin_half",
+        "mean_per_contact_paise": 156532.9293791562,
+        "uplift_vs_a": 1.7511748121601347,
+        "contacts": 51542,
+        "total_recovered_paise": 8068065921,
+        "gate_passed": true
+      },
+      {
+        "configuration": "phase6_heuristic",
+        "mean_per_contact_paise": 156957.36981923878,
+        "uplift_vs_a": 1.7559231383486416,
+        "contacts": 51542,
+        "total_recovered_paise": 8089920774,
+        "gate_passed": true
+      },
+      {
+        "configuration": "phase6_model",
+        "mean_per_contact_paise": 156957.36981923878,
+        "uplift_vs_a": 1.7559231383486416,
+        "contacts": 51542,
+        "total_recovered_paise": 8089920774,
+        "gate_passed": true
+      }
+    ],
+    "interpretation": {
+      "caps_and_policy_alone": "fifo_under_cap removes expected-value scoring AND ranking while keeping contact caps and hard policy. Its uplift is the contribution of the compliance half alone.",
+      "ranking_and_allocation": "headline minus fifo_under_cap is the contribution of expected-value ranking.",
+      "margin_budget": "merchant_margin_half vs headline \u2014 near-inert at headline capacity, as constants.py predicted in prose.",
+      "models": "phase6_model equals phase6_heuristic exactly. Model contribution is zero."
+    }
+  },
+  "world_v1_gate_reported_beside_not_differenced": {
+    "world": "v1",
+    "mean_a_per_contact_paise": 89387.38057,
+    "mean_b_per_contact_paise": 156957.36981923878,
+    "min_uplift_ratio": 1.711386778074912,
+    "max_uplift_ratio": 1.8821746334249845,
+    "total_a_contacts": 100000,
+    "total_b_contacts": 51542,
+    "total_a_recovered_paise": 8938738057,
+    "total_b_recovered_paise": 8089920774,
+    "gate_passed": true,
+    "constants_commit_sha": "aa87123aafdc9d812f5a01c04766c60b9198a2ce",
+    "note": "Reported for reference. NOT differenced against the world-v2 table above: Arm A has no natural-recovery accounting, so its total is not commensurable."
+  },
+  "compliance": {
+    "world": "v1",
+    "arm_a": {
+      "7": {
+        "quiet_hour_violations": 10059,
+        "contact_cap_24h_breaches": 2442,
+        "contact_cap_7d_breaches": 4098,
+        "conflicting_action_incidents": 1227,
+        "interlock_dispute_open_violations": 2719
+      },
+      "42": {
+        "quiet_hour_violations": 10054,
+        "contact_cap_24h_breaches": 2454,
+        "contact_cap_7d_breaches": 4063,
+        "conflicting_action_incidents": 1268,
+        "interlock_dispute_open_violations": 2848
+      },
+      "101": {
+        "quiet_hour_violations": 9984,
+        "contact_cap_24h_breaches": 2435,
+        "contact_cap_7d_breaches": 4122,
+        "conflicting_action_incidents": 1245,
+        "interlock_dispute_open_violations": 2754
+      },
+      "2024": {
+        "quiet_hour_violations": 9869,
+        "contact_cap_24h_breaches": 2448,
+        "contact_cap_7d_breaches": 4176,
+        "conflicting_action_incidents": 1271,
+        "interlock_dispute_open_violations": 2845
+      },
+      "31337": {
+        "quiet_hour_violations": 9931,
+        "contact_cap_24h_breaches": 2469,
+        "contact_cap_7d_breaches": 4158,
+        "conflicting_action_incidents": 1220,
+        "interlock_dispute_open_violations": 2826
+      }
+    },
+    "arm_b": {
+      "7": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1804,
+          "fact_unavailable.refund_in_flight": 4327,
+          "fact_unavailable.fraud_review": 4337,
+          "fact_unavailable.mandate_cancellation": 2533,
+          "fact_unavailable.consent_scope": 10327
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      },
+      "42": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1756,
+          "fact_unavailable.refund_in_flight": 4356,
+          "fact_unavailable.fraud_review": 4395,
+          "fact_unavailable.mandate_cancellation": 2639,
+          "fact_unavailable.consent_scope": 10299
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      },
+      "101": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1660,
+          "fact_unavailable.refund_in_flight": 4415,
+          "fact_unavailable.fraud_review": 4294,
+          "fact_unavailable.mandate_cancellation": 2634,
+          "fact_unavailable.consent_scope": 10350
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      },
+      "2024": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1679,
+          "fact_unavailable.refund_in_flight": 4366,
+          "fact_unavailable.fraud_review": 4264,
+          "fact_unavailable.mandate_cancellation": 2585,
+          "fact_unavailable.consent_scope": 10321
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      },
+      "31337": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1763,
+          "fact_unavailable.refund_in_flight": 4326,
+          "fact_unavailable.fraud_review": 4335,
+          "fact_unavailable.mandate_cancellation": 2572,
+          "fact_unavailable.consent_scope": 10245
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      }
+    },
+    "scope_violations": {
+      "arm_a": 0,
+      "arm_b": 0,
+      "provenance": "observed",
+      "note": "THE CONTROL ROW. Expected to read 0/0 and it does. The four agents are correctly scoped in BOTH arms, so authorization was never the binding constraint \u2014 every other row moves and this one does not. Stating that out loud is the point."
+    },
+    "fact_unavailable_note": "fact_unavailable counts are RECORDED, not RESOLVED. FACT_UNAVAILABLE never short-circuits: a candidate can be hard-ADMISSIBLE and still carry recorded gaps."
+  },
+  "unmeasurable_rows": {
+    "p99_grant_decision_latency": "NOT MEASURED. No latency instrumentation exists anywhere in the codebase. Reported as absent rather than estimated from an in-memory run, which would not represent the SERIALIZABLE issuance round-trip that dominates real decision cost."
+  }
+}

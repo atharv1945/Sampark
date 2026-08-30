@@ -136,7 +136,14 @@ def _sigmoid(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def p_recover(profile: HiddenResponseProfile, incentive_bps: int, prior_contacts: int) -> float:
+def p_recover(
+    profile: HiddenResponseProfile,
+    incentive_bps: int,
+    prior_contacts: int,
+    *,
+    beta_fatigue: float = BETA_FATIGUE,
+    beta_incentive: float = BETA_INCENTIVE,
+) -> float:
     """Pure ground-truth recovery probability — no RNG, no state.
 
     Exposed at module level (rather than buried inside Environment.observe)
@@ -144,11 +151,27 @@ def p_recover(profile: HiddenResponseProfile, incentive_bps: int, prior_contacts
     incentive never helps a less price-sensitive customer more than a
     more price-sensitive one) are directly testable without drawing a
     stochastic outcome.
+
+    --- Phase 9: the two coefficients are parameters, not constants ---
+
+    `beta_fatigue` / `beta_incentive` are KEYWORD-ONLY and default to this
+    module's frozen `BETA_FATIGUE` / `BETA_INCENTIVE`, so every pre-Phase-9
+    call site — which passes neither — is byte-identical. They exist because
+    spec §11 requires a sensitivity sweep over the fatigue-hazard parameter,
+    and this module's own docstring already named that sweep as the expected
+    revisit of these two coefficients.
+
+    Scaling `beta_fatigue` by k is exactly equivalent to scaling every
+    customer's `fatigue_hazard` by k. It does NOT touch any RNG stream: the
+    population draw is unchanged and `observe`'s response-model Generator
+    makes the same number of draws in the same order. Only the threshold
+    those draws are compared against moves. See `sim/sensitivity.py` for why
+    that makes the sweep a pure re-observation.
     """
     logit_p = (
         _logit(profile.conversion_propensity)
-        + BETA_INCENTIVE * (incentive_bps / 10_000) * profile.price_sensitivity
-        - BETA_FATIGUE * prior_contacts * profile.fatigue_hazard
+        + beta_incentive * (incentive_bps / 10_000) * profile.price_sensitivity
+        - beta_fatigue * prior_contacts * profile.fatigue_hazard
     )
     return _sigmoid(logit_p)
 
@@ -208,6 +231,8 @@ class Environment:
         world: str = "v1",
         natural_rng: "_RandomSource | None" = None,
         optout_rng: "_RandomSource | None" = None,
+        beta_fatigue: float = BETA_FATIGUE,
+        beta_incentive: float = BETA_INCENTIVE,
     ) -> None:
         if world not in VALID_WORLDS:
             raise ValueError(f"world must be one of {VALID_WORLDS}, got {world!r}")
@@ -218,6 +243,10 @@ class Environment:
         self._world = world
         self._natural_rng = natural_rng
         self._optout_rng = optout_rng
+        # Phase 9 (spec §11 sensitivity sweep). Default to the frozen
+        # module constants, so every pre-Phase-9 construction is unchanged.
+        self._beta_fatigue = beta_fatigue
+        self._beta_incentive = beta_incentive
         self._true_contacts: dict[str, int] = defaultdict(int)
         self._observed_risk_ids: set[str] = set()
 
@@ -230,6 +259,8 @@ class Environment:
         seed: int,
         *,
         world: str = "v1",
+        beta_fatigue: float = BETA_FATIGUE,
+        beta_incentive: float = BETA_INCENTIVE,
     ) -> "Environment":
         """`world="v1"` (default; every pre-Phase-7 call site) constructs
         ONLY the unchanged response-model RNG — `natural_rng`/`optout_rng`
@@ -250,6 +281,8 @@ class Environment:
             world=world,
             natural_rng=natural_rng,
             optout_rng=optout_rng,
+            beta_fatigue=beta_fatigue,
+            beta_incentive=beta_incentive,
         )
 
     def observe(self, action: ContactAction, risk_item: RiskItem) -> ContactOutcome:
@@ -264,7 +297,13 @@ class Environment:
         profile = self._profile_by_customer[action.customer_id]
         prior_contacts = self._true_contacts[action.customer_id]
 
-        probability = p_recover(profile, action.incentive_bps, prior_contacts)
+        probability = p_recover(
+            profile,
+            action.incentive_bps,
+            prior_contacts,
+            beta_fatigue=self._beta_fatigue,
+            beta_incentive=self._beta_incentive,
+        )
         recovered = bool(self._rng.random() < probability)
 
         self._true_contacts[action.customer_id] += 1

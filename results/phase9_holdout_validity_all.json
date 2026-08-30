@@ -1,0 +1,252 @@
+{
+  "phase": 9,
+  "artifact": "holdout estimator vs Arm H ground truth, all cells",
+  "ci_method": "Wilson score interval, z=1.96",
+  "constants_commit_sha": "eabdbd16140e7a0b06de8c5cc343682b427c6e0f",
+  "n_cells": 10,
+  "n_cells_ground_truth_inside_ci": 10,
+  "containment_rate": 1.0,
+  "extends": "results/phase7_holdout_validity_seed42_f10.json (one cell) to all cells",
+  "cells": [
+    {
+      "seed": 7,
+      "fraction": 0.1,
+      "holdout_estimate": {
+        "rate": 0.0473313192346425,
+        "n": 1986,
+        "recoveries": 94,
+        "wilson_ci_95": [
+          0.038834181001084926,
+          0.05757630715033376
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.0525,
+        "n": 20000,
+        "recoveries": 1050,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 7,
+      "fraction": 0.2,
+      "holdout_estimate": {
+        "rate": 0.05100228368434408,
+        "n": 3941,
+        "recoveries": 201,
+        "wilson_ci_95": [
+          0.044560176107623986,
+          0.05831888499333379
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.0525,
+        "n": 20000,
+        "recoveries": 1050,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 42,
+      "fraction": 0.1,
+      "holdout_estimate": {
+        "rate": 0.0509683995922528,
+        "n": 1962,
+        "recoveries": 100,
+        "wilson_ci_95": [
+          0.042083986882282404,
+          0.06160778563896244
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.05285,
+        "n": 20000,
+        "recoveries": 1057,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 42,
+      "fraction": 0.2,
+      "holdout_estimate": {
+        "rate": 0.04969574036511156,
+        "n": 3944,
+        "recoveries": 196,
+        "wilson_ci_95": [
+          0.043340755873546244,
+          0.05692709681841587
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.05285,
+        "n": 20000,
+        "recoveries": 1057,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 101,
+      "fraction": 0.1,
+      "holdout_estimate": {
+        "rate": 0.054600606673407485,
+        "n": 1978,
+        "recoveries": 108,
+        "wilson_ci_95": [
+          0.04542383127123567,
+          0.06550410565369316
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.05475,
+        "n": 20000,
+        "recoveries": 1095,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 101,
+      "fraction": 0.2,
+      "holdout_estimate": {
+        "rate": 0.05211231975714647,
+        "n": 3953,
+        "recoveries": 206,
+        "wilson_ci_95": [
+          0.04560835495131366,
+          0.05948597078565798
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.05475,
+        "n": 20000,
+        "recoveries": 1095,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 2024,
+      "fraction": 0.1,
+      "holdout_estimate": {
+        "rate": 0.05455455455455455,
+        "n": 1998,
+        "recoveries": 109,
+        "wilson_ci_95": [
+          0.04542382507105583,
+          0.06539493301649714
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.0529,
+        "n": 20000,
+        "recoveries": 1058,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 2024,
+      "fraction": 0.2,
+      "holdout_estimate": {
+        "rate": 0.0472636815920398,
+        "n": 4020,
+        "recoveries": 190,
+        "wilson_ci_95": [
+          0.04112497505731353,
+          0.05426685149967619
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.0529,
+        "n": 20000,
+        "recoveries": 1058,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 31337,
+      "fraction": 0.1,
+      "holdout_estimate": {
+        "rate": 0.04458917835671343,
+        "n": 1996,
+        "recoveries": 89,
+        "wilson_ci_95": [
+          0.036375559481454975,
+          0.05455244201626365
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.054,
+        "n": 20000,
+        "recoveries": 1080,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    },
+    {
+      "seed": 31337,
+      "fraction": 0.2,
+      "holdout_estimate": {
+        "rate": 0.05441503833786792,
+        "n": 4043,
+        "recoveries": 220,
+        "wilson_ci_95": [
+          0.047836354201008506,
+          0.0618396953878857
+        ],
+        "provenance": "estimated",
+        "note": "randomized holdout \u2014 the only control a real merchant could actually run"
+      },
+      "arm_h_ground_truth": {
+        "rate": 0.054,
+        "n": 20000,
+        "recoveries": 1080,
+        "provenance": "ground_truth",
+        "note": "full-population zero-contact counterfactual \u2014 NOT obtainable in production"
+      },
+      "arm_h_within_holdout_ci": true,
+      "ci_method": "Wilson score interval, z=1.96"
+    }
+  ]
+}

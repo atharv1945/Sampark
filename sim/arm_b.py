@@ -93,7 +93,7 @@ from sampark.registry.store import (
     PostgresRiskItemRepository,
 )
 from sim.cli import build_dataset
-from sim.environment import Environment
+from sim.environment import BETA_FATIGUE, BETA_INCENTIVE, Environment
 from sim.ledger import Ledger
 from sim.persistence import PostgresConfig, load_ledger
 
@@ -584,6 +584,8 @@ def run_arm_b(
     audit_sink: "AuditSink | None" = None,
     scorer: "Scorer | None" = None,
     outcome_observer=None,
+    beta_fatigue: float = BETA_FATIGUE,
+    beta_incentive: float = BETA_INCENTIVE,
 ) -> ArmBResult:
     """`backend` defaults to "memory" — EVERY existing call site and unit
     test that calls `run_arm_b(seed)` is unaffected by Blocker 1's
@@ -605,13 +607,28 @@ def run_arm_b(
     `outcome_observer` (Phase 6) — read-only per-window instrumentation
     hook, threaded straight through to
     `sampark.mediation.service.mediate_window`; see that function's
-    docstring. `None` by default, zero effect on any existing caller."""
+    docstring. `None` by default, zero effect on any existing caller.
+
+    `beta_fatigue` / `beta_incentive` (Phase 9, spec §11's sensitivity sweep) —
+    default to the frozen `sim.environment` constants, so `run_arm_b(seed, ...)`
+    without them is byte-identical (verified against the committed
+    `results/arm_b_metrics_*.json`). They reach ONLY `Environment`'s
+    ground-truth response model. Under world v1 no realized outcome feeds back
+    into any admission, ranking, grant, deferral or denial — agent actions are
+    all selected before the window loop starts, `carried_forward` is a function
+    of the DECISION not the outcome, and nothing reads `outcome.recovered` — so
+    varying either coefficient changes which contacts SUCCEED, never which
+    contacts HAPPEN. `sim/sensitivity.py` depends on that property and
+    `tests/sim_sensitivity/` asserts it directly."""
     if backend not in _VALID_BACKENDS:
         raise ValueError(f"backend must be one of {_VALID_BACKENDS}, got {backend!r}")
 
     population, signals, ledger = build_dataset(seed)
     view = _build_ledger_view(ledger)
-    environment = Environment.build(population, signals, ledger, seed)
+    environment = Environment.build(
+        population, signals, ledger, seed,
+        beta_fatigue=beta_fatigue, beta_incentive=beta_incentive,
+    )
 
     all_actions: list[ContactAction] = []
     for agent in _AGENTS:

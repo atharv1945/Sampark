@@ -1,0 +1,549 @@
+{
+  "phase": 9,
+  "artifact": "sensitivity sweep report",
+  "constants_commit_sha": "eabdbd16140e7a0b06de8c5cc343682b427c6e0f",
+  "precommitment": "results/phase9_precommitment.json",
+  "seeds": [
+    7,
+    42,
+    101,
+    2024,
+    31337
+  ],
+  "backend": "memory",
+  "world": "v1",
+  "primary_metric": "mean(Arm B recovered_amount_per_contact_paise) / mean(Arm A recovered_amount_per_contact_paise) over the five precommitted seeds",
+  "dimensions": {
+    "beta_fatigue": {
+      "values": [
+        0.0,
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        1.5,
+        2.0
+      ],
+      "frozen_value": 1.0,
+      "aggregate": [
+        {
+          "value": 0.0,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 112582.76724,
+          "mean_b_per_contact_paise": 174645.95471984014,
+          "mean_uplift_ratio": 1.5512672054643675,
+          "min_uplift_ratio": 1.5051829791136853,
+          "max_uplift_ratio": 1.6177631862470505,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 11258276724,
+          "total_b_recovered_paise": 9001583146,
+          "total_recovery_ratio": 0.7995524862886645,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 0.25,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 106244.32276000001,
+          "mean_b_per_contact_paise": 169915.65413786203,
+          "mean_uplift_ratio": 1.5992916112957114,
+          "min_uplift_ratio": 1.5670320051362137,
+          "max_uplift_ratio": 1.654469956771892,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 10624432276,
+          "total_b_recovered_paise": 8757695186,
+          "total_recovery_ratio": 0.8242977091381292,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 0.5,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 99816.10151,
+          "mean_b_per_contact_paise": 165431.097254717,
+          "mean_uplift_ratio": 1.657358830410176,
+          "min_uplift_ratio": 1.6193847199301588,
+          "max_uplift_ratio": 1.7379160952281743,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 9981610151,
+          "total_b_recovered_paise": 8526537511,
+          "total_recovery_ratio": 0.8542246573460671,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 0.75,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 94378.61736,
+          "mean_b_per_contact_paise": 161103.48609757144,
+          "mean_uplift_ratio": 1.7069913779628128,
+          "min_uplift_ratio": 1.6701064710441142,
+          "max_uplift_ratio": 1.8091603555219204,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 9437861736,
+          "total_b_recovered_paise": 8303618849,
+          "total_recovery_ratio": 0.8798199296909047,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 1.0,
+          "is_frozen_anchor": true,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 89387.38057000001,
+          "mean_b_per_contact_paise": 156957.36981923878,
+          "mean_uplift_ratio": 1.7559231383486413,
+          "min_uplift_ratio": 1.711386778074912,
+          "max_uplift_ratio": 1.8821746334249845,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 8938738057,
+          "total_b_recovered_paise": 8089920774,
+          "total_recovery_ratio": 0.9050405910110226,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 1.5,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 80755.46849,
+          "mean_b_per_contact_paise": 149944.62296354352,
+          "mean_uplift_ratio": 1.8567736125772245,
+          "min_uplift_ratio": 1.8127357149498895,
+          "max_uplift_ratio": 2.016124206386753,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 8075546849,
+          "total_b_recovered_paise": 7728595797,
+          "total_recovery_ratio": 0.9570368349676576,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 2.0,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 74202.92857999999,
+          "mean_b_per_contact_paise": 143079.18856793118,
+          "mean_uplift_ratio": 1.9282148468530322,
+          "min_uplift_ratio": 1.8840761903958803,
+          "max_uplift_ratio": 2.05943580104669,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 7420292858,
+          "total_b_recovered_paise": 7374632215,
+          "total_recovery_ratio": 0.9938465173984646,
+          "b_beats_a_on_per_contact": true
+        }
+      ],
+      "crossing": {
+        "crossing_exists_in_tested_range": false,
+        "crossing_bracket": null,
+        "note": "Arm B beats Arm A on rupees-per-contact at every tested value. No losing boundary exists inside this range; see the report's interpretation for what that implies."
+      },
+      "anchor_checks": [
+        {
+          "seed": 7,
+          "dimension": "beta_fatigue",
+          "anchor_value": 1.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_7.json",
+            "results/arm_b_metrics_7.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 42,
+          "dimension": "beta_fatigue",
+          "anchor_value": 1.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_42.json",
+            "results/arm_b_metrics_42.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 101,
+          "dimension": "beta_fatigue",
+          "anchor_value": 1.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_101.json",
+            "results/arm_b_metrics_101.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 2024,
+          "dimension": "beta_fatigue",
+          "anchor_value": 1.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_2024.json",
+            "results/arm_b_metrics_2024.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 31337,
+          "dimension": "beta_fatigue",
+          "anchor_value": 1.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_31337.json",
+            "results/arm_b_metrics_31337.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        }
+      ]
+    },
+    "beta_incentive": {
+      "values": [
+        2.0,
+        4.0,
+        8.0
+      ],
+      "frozen_value": 4.0,
+      "aggregate": [
+        {
+          "value": 2.0,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 88473.79242,
+          "mean_b_per_contact_paise": 155887.4482916019,
+          "mean_uplift_ratio": 1.761961864950673,
+          "min_uplift_ratio": 1.7208778063017274,
+          "max_uplift_ratio": 1.890394308444601,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 8847379242,
+          "total_b_recovered_paise": 8034812991,
+          "total_recovery_ratio": 0.9081574069818765,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 4.0,
+          "is_frozen_anchor": true,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 89387.38057000001,
+          "mean_b_per_contact_paise": 156957.36981923878,
+          "mean_uplift_ratio": 1.7559231383486413,
+          "min_uplift_ratio": 1.711386778074912,
+          "max_uplift_ratio": 1.8821746334249845,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 8938738057,
+          "total_b_recovered_paise": 8089920774,
+          "total_recovery_ratio": 0.9050405910110226,
+          "b_beats_a_on_per_contact": true
+        },
+        {
+          "value": 8.0,
+          "is_frozen_anchor": false,
+          "n_seeds": 5,
+          "mean_a_per_contact_paise": 91122.61871,
+          "mean_b_per_contact_paise": 158972.94249533792,
+          "mean_uplift_ratio": 1.7446046299577196,
+          "min_uplift_ratio": 1.702165881526081,
+          "max_uplift_ratio": 1.8654518435580287,
+          "total_a_contacts": 100000,
+          "total_b_contacts": 51542,
+          "total_a_recovered_paise": 9112261871,
+          "total_b_recovered_paise": 8193778686,
+          "total_recovery_ratio": 0.8992036008180258,
+          "b_beats_a_on_per_contact": true
+        }
+      ],
+      "crossing": {
+        "crossing_exists_in_tested_range": false,
+        "crossing_bracket": null,
+        "note": "Arm B beats Arm A on rupees-per-contact at every tested value. No losing boundary exists inside this range; see the report's interpretation for what that implies."
+      },
+      "anchor_checks": [
+        {
+          "seed": 7,
+          "dimension": "beta_incentive",
+          "anchor_value": 4.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_7.json",
+            "results/arm_b_metrics_7.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 42,
+          "dimension": "beta_incentive",
+          "anchor_value": 4.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_42.json",
+            "results/arm_b_metrics_42.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 101,
+          "dimension": "beta_incentive",
+          "anchor_value": 4.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_101.json",
+            "results/arm_b_metrics_101.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 2024,
+          "dimension": "beta_incentive",
+          "anchor_value": 4.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_2024.json",
+            "results/arm_b_metrics_2024.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        },
+        {
+          "seed": 31337,
+          "dimension": "beta_incentive",
+          "anchor_value": 4.0,
+          "reproduces_committed_phase4_evidence": true,
+          "compared_against": [
+            "results/arm_a_metrics_31337.json",
+            "results/arm_b_metrics_31337.json"
+          ],
+          "fields_compared": [
+            "a_contacts",
+            "a_incentive_paise",
+            "a_recovered_paise",
+            "a_recoveries",
+            "b_contacts",
+            "b_incentive_paise",
+            "b_recovered_paise",
+            "b_recoveries"
+          ]
+        }
+      ]
+    }
+  },
+  "predictions": [
+    {
+      "id": "P1",
+      "claim": "mean uplift ratio is monotonically non-decreasing in beta_fatigue",
+      "result": "PASS",
+      "measured": {
+        "values": [
+          0.0,
+          0.25,
+          0.5,
+          0.75,
+          1.0,
+          1.5,
+          2.0
+        ],
+        "mean_uplift_ratio": [
+          1.5512672054643675,
+          1.5992916112957114,
+          1.657358830410176,
+          1.7069913779628128,
+          1.7559231383486413,
+          1.8567736125772245,
+          1.9282148468530322
+        ]
+      }
+    },
+    {
+      "id": "P2",
+      "claim": "mean uplift ratio at beta_fatigue = 0.0 lies in [1.30, 1.70]",
+      "result": "PASS",
+      "measured": {
+        "mean_uplift_ratio_at_zero": 1.5512672054643675
+      }
+    },
+    {
+      "id": "P3",
+      "claim": "no crossing in beta_fatigue [0.0, 2.0]; Arm B never loses on rupees-per-contact",
+      "result": "PASS",
+      "measured": {
+        "crossing_exists_in_tested_range": false,
+        "crossing_bracket": null,
+        "note": "Arm B beats Arm A on rupees-per-contact at every tested value. No losing boundary exists inside this range; see the report's interpretation for what that implies."
+      }
+    },
+    {
+      "id": "P4",
+      "claim": "Arm B recovers less TOTAL rupees at every beta_fatigue, and the shortfall shrinks monotonically as beta_fatigue rises",
+      "result": "PASS",
+      "measured": {
+        "values": [
+          0.0,
+          0.25,
+          0.5,
+          0.75,
+          1.0,
+          1.5,
+          2.0
+        ],
+        "total_recovery_ratio": [
+          0.7995524862886645,
+          0.8242977091381292,
+          0.8542246573460671,
+          0.8798199296909047,
+          0.9050405910110226,
+          0.9570368349676576,
+          0.9938465173984646
+        ],
+        "shortfall_fraction": [
+          0.2004475137113355,
+          0.17570229086187084,
+          0.14577534265393288,
+          0.12018007030909528,
+          0.09495940898897737,
+          0.04296316503234243,
+          0.006153482601535365
+        ]
+      }
+    },
+    {
+      "id": "P5",
+      "claim": "Arm A and Arm B contact counts are byte-identical at every tested value",
+      "result": "PASS",
+      "measured": {
+        "seed_7_arm_A": [
+          20000
+        ],
+        "seed_7_arm_B": [
+          10327
+        ],
+        "seed_42_arm_A": [
+          20000
+        ],
+        "seed_42_arm_B": [
+          10299
+        ],
+        "seed_101_arm_A": [
+          20000
+        ],
+        "seed_101_arm_B": [
+          10350
+        ],
+        "seed_2024_arm_A": [
+          20000
+        ],
+        "seed_2024_arm_B": [
+          10321
+        ],
+        "seed_31337_arm_A": [
+          20000
+        ],
+        "seed_31337_arm_B": [
+          10245
+        ]
+      }
+    },
+    {
+      "id": "P6",
+      "claim": "mean uplift ratio is monotonically non-increasing in beta_incentive",
+      "result": "PASS",
+      "measured": {
+        "values": [
+          2.0,
+          4.0,
+          8.0
+        ],
+        "mean_uplift_ratio": [
+          1.761961864950673,
+          1.7559231383486413,
+          1.7446046299577196
+        ]
+      }
+    }
+  ]
+}

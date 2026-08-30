@@ -379,7 +379,7 @@ one and present it as settled.
 | 6 — Intelligence layer | CLOSED (evidence committed `510e5fa`) |
 | 7 — Attribution & policy compiler | **ENGINEERING CLOSED.** Evidence preserved at the documented seed-42 scope. Design decisions recorded in `DECISIONS.md`. See the three-way distinction below — this is not the same claim as "nothing remains." |
 | 8 — Demo surface | **CLOSED.** FastAPI + SSE + vanilla-JS one-screen trace, deterministic ~40s replay, all three §12.3 failures, all seven §12.4 chaos controls. Implemented, tested, demonstrated live, decisions recorded in `DECISIONS.md`, and committed. One owner validation item remains open and is named below — it is not an engineering gap. |
-| 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | DEFERRED, **not started** |
+| 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | **ENGINEERING CLOSED.** 50-point precommitted sensitivity sweep (all 6 predictions PASS), canonical A/B/H table, `ARCHITECTURE.md`, `DISCLAIMER.md`, README front matter, `policies/README.md`. Phase 4 protection intact; `sampark/` untouched. One owner validation item (cold-viewer) still open from Phase 8. |
 
 **PHASES 0–8 CLOSED. PHASE 9 NOT STARTED.**
 
@@ -868,8 +868,88 @@ green at zero and red if ever non-zero. All three read 0 on a real run.
 `tests/test_ui_renders_only_audit_events.py` and `tests/ui/**` were re-run
 after this change: 50 passed.
 
-**Phase 9 remains Phase 9.** No sensitivity sweep, no final A/B/H table, and
-`ARCHITECTURE.md` / `DISCLAIMER.md` are still 0 bytes. No Phase 9 work has
-been started, designed, or scaffolded.
+---
+
+**Phase 9 status (Evidence run, sensitivity analysis, final documentation):
+ENGINEERING CLOSED.** Spec §18.1's exit criterion — *"Every cell filled
+including unfavourable ones; a stranger can run it from the README alone"* —
+is met on the first clause by executable evidence, and on the second by a
+rewritten README front matter with a quickstart. The second clause's ultimate
+test is a human one and is named as owner-only below.
+
+**What was built (all new, plus keyword-only parameters on three `sim/`
+functions — `sampark/` was not touched at all):**
+`sim/sensitivity.py` (the spec §11 sweep), `sim/abh_table.py` (the canonical
+A/B/H table, Wilson intervals, mechanism decomposition), keyword-only
+`beta_fatigue`/`beta_incentive` on `sim/environment.py`'s `p_recover` /
+`Environment`, `sim/arm_a.py::run_arm_a` and `sim/arm_b.py::run_arm_b` (every
+default resolves to the frozen module constant, so every pre-Phase-9 call site
+is byte-identical), plus `tests/sim_sensitivity/`, `tests/sim_abh/` and
+`tests/arm_b/test_memory_postgres_parity_at_anchor.py`.
+
+**The precommitment came first, deliberately.** `results/phase9_precommitment.json`
+was committed in its own commit BEFORE `sim/sensitivity.py` existed and before
+any result was observed, mirroring Phase 7's Decision-17 mechanism. A test
+(`tests/sim_sensitivity/test_precommitment_binding.py`) asserts the code's grid
+still equals that committed file, so the grid cannot drift once results are in.
+
+**The property the sweep rests on, asserted rather than argued:** under world v1
+no realized outcome feeds back into any decision (agents select all actions
+before the window loop; `carried_forward` is a function of the decision, not the
+outcome; nothing reads `outcome.recovered`). So varying `BETA_FATIGUE` changes
+which contacts SUCCEED and never which contacts HAPPEN — every decision and
+`prev_hash` is invariant. `tests/sim_sensitivity/test_decision_invariance.py`
+proves it directly, with a negative control showing the parameter is genuinely
+wired to something. That is why the sweep needed no allocator re-run, no
+SERIALIZABLE issuance and no PostgreSQL: 88.9 minutes instead of the ~12 hours a
+Postgres grid would have cost on a disk with 12.8 GB free — the same low-disk
+condition that crashed Docker in Phase 6.
+
+**Evidence collected (50/50 points, grid verified identical to the
+precommitment, 10/10 anchor checks reproducing committed Phase 4 evidence,
+0 tracebacks):**
+- All six precommitted predictions **PASS**.
+- `BETA_FATIGUE` 0.0 → 2.0: mean uplift 1.5513× → 1.9282×, monotone.
+- **The finding that qualifies the pitch:** at `BETA_FATIGUE = 0.0` the
+  cross-agent fatigue externality is switched off entirely and Arm B still wins
+  by 1.5513× — about 73% of the frozen-value advantage. **Selection, not fatigue
+  internalisation, is the dominant mechanism.** Spec §8.6 calls the fatigue term
+  "the whole thesis expressed as arithmetic"; the measurement does not support
+  that as the primary driver. Recorded in README, ARCHITECTURE.md and
+  DISCLAIMER.md rather than left for a reviewer to find.
+- **The genuine losing condition:** Arm B recovers less TOTAL revenue at every
+  one of the 50 points (`B ÷ A` 0.7996 → 0.9938). No crossing exists on
+  ₹/contact, so "where SAMPARK stops winning" is answered on the revenue axis.
+- A/B/H (world v2, f=0.10, 5 seeds): contacts −48.5%, total revenue −8.2%,
+  ₹/contact 1.687×; **holdout ground truth inside the Wilson 95% interval in
+  10/10 cells** (Phase 9 extended Phase 7's single-cell check to all ten).
+
+**A defect Phase 9 found in its own new code:** the Wilson interval returned a
+lower bound of −2.8e-17 at zero successes — a negative probability, from float
+cancellation. Its own invariant test caught it before any result was published.
+Clamped to [0,1]; the bit-for-bit reproduction of the committed Phase 7 interval
+still passes.
+
+**Scope reductions: none.** The owner authorized full scope and the full
+precommitted 50-point grid was executed.
+
+**Deliberately NOT done, each recorded rather than silently skipped:**
+contact-cap sensitivity (both constants are module-scope imports inside
+PROTECTED Phase 4 files — the most economically interesting knob in the system,
+and protection forbids touching it); loosening `build_scorer()`'s all-or-nothing
+model gate even though fatigue-hazard is available and uplift is not (loosening
+an availability gate after seeing which half passed is result-driven tuning);
+the live English→IR LLM call (`ANTHROPIC_API_KEY` present but empty); p99 grant
+decision latency (no instrumentation exists anywhere — reported as NOT MEASURED
+rather than estimated from an in-memory run).
+
+**`DECISIONS.md` was NOT modified** (CLAUDE.md §13). Phase 9's proposed decisions
+and prepared entry text are in `PHASE9_OWNER_DECISIONS_PROPOSAL.md`, following the
+existing `*_PROPOSAL.md` convention.
+
+**Open owner items:** the Phase 8 cold-viewer criterion (still the only open item
+from Phases 0–8); whether to ship a commented `policies/activated.yaml`; CI
+runtime (the full suite now genuinely runs the ~1h40m Postgres holdout tests);
+and whether to supply an API key for a live compiler run.
 
 Update this section at each phase boundary.
