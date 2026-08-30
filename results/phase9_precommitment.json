@@ -1,0 +1,103 @@
+{
+  "phase": 9,
+  "artifact": "sensitivity sweep precommitment",
+  "written_at_commit": "98491267b667bc4403eda36f4897801759b26257",
+  "written_before": "any line of sim/sensitivity.py existed, and before any sweep result was observed",
+  "authority": "spec §11 ('Add a sensitivity analysis: sweep the fatigue-hazard parameter across a plausible range and plot where SAMPARK stops winning') and spec §14 Round 7 ('commit the generator, publish the parameters, add the sensitivity sweep showing where SAMPARK stops winning'). sim/environment.py's own docstring names this sweep as the expected revisit of BETA_FATIGUE/BETA_INCENTIVE.",
+  "discipline": "Mirrors the Phase 7 Decision-17 precommitment mechanism (results/phase7_decision17_precommitment_seed42_f10.json): the prediction is committed to git BEFORE the experiment runs, and is never edited afterwards. A failed prediction is reported as failed.",
+
+  "dimensions": [
+    {
+      "id": "beta_fatigue",
+      "parameter": "sim.environment.BETA_FATIGUE",
+      "frozen_value": 1.0,
+      "source_of_authority": "sim/environment.py lines 17-19: 'BETA_INCENTIVE / BETA_FATIGUE are simulation coefficients, locked as a Phase 2 starting point -- they are not calibrated against anything and are expected to be revisited (e.g. the spec §11 sensitivity sweep).'",
+      "values": [0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0],
+      "anchor": 1.0,
+      "why_these_values": "0.0 removes the cross-agent fatigue externality entirely (the term spec §8.6 calls 'the whole thesis expressed as arithmetic'); 2.0 doubles it. The frozen value 1.0 sits inside the range and must reproduce the committed Phase 4 headline exactly. Linear spacing at 0.25 below the anchor resolves the region where a crossing is most plausible; coarser spacing above, where the trend is expected to be monotone and uninteresting.",
+      "hypothesis": "H1: Arm B's rupees-per-contact advantage over Arm A is driven by the cross-agent fatigue externality, and shrinks as that externality shrinks."
+    },
+    {
+      "id": "beta_incentive",
+      "parameter": "sim.environment.BETA_INCENTIVE",
+      "frozen_value": 4.0,
+      "source_of_authority": "same line of sim/environment.py",
+      "values": [2.0, 4.0, 8.0],
+      "anchor": 4.0,
+      "why_these_values": "Halving and doubling the potency of a discount. Tests the merchant-margin budget mechanism, which results/gate_merchant_margin_half.json measured as near-inert (-0.27%) at the frozen incentive potency.",
+      "hypothesis": "H2: as incentives become more potent, the unmediated arm can buy recoveries that SAMPARK's margin discipline declines to buy, so SAMPARK's advantage falls."
+    }
+  ],
+
+  "seeds": [7, 42, 101, 2024, 31337],
+  "backend": "memory",
+  "backend_justification": "Verified at the anchor before the sweep was written: run_arm_b(42, backend='memory') reproduces results/arm_b_metrics_42.json (postgres-backed, constants_commit_sha aa87123) bit-for-bit on total_contacts, total_recoveries, recovered_amount_paise, incentive_spend_paise and recovered_amount_per_contact_paise, in 63 seconds instead of ~48 minutes. Pinned as a regression test.",
+
+  "primary_metric": "uplift_ratio = mean(Arm B recovered_amount_per_contact_paise) / mean(Arm A recovered_amount_per_contact_paise), over exactly the five precommitted seeds, matching sim/gate.py's own gate definition",
+
+  "predictions": [
+    {
+      "id": "P1",
+      "claim": "The 5-seed mean uplift ratio is monotonically non-decreasing in beta_fatigue across all seven points."
+    },
+    {
+      "id": "P2",
+      "claim": "The 5-seed mean uplift ratio at beta_fatigue = 0.0 lies in the interval [1.30, 1.70].",
+      "reasoning_recorded_in_advance": "results/gate_fifo_under_cap.json shows caps and hard policy WITHOUT expected-value ranking buy only 1.06-1.14x. The headline is 1.71-1.88x. If ranking (selection on amount and expected net) is what carries the remainder, it should survive the removal of fatigue, landing below the headline but well above the fifo floor."
+    },
+    {
+      "id": "P3",
+      "claim": "No crossing point exists in beta_fatigue ∈ [0.0, 2.0]: Arm B never loses to Arm A on rupees-per-contact at any tested value."
+    },
+    {
+      "id": "P4",
+      "claim": "Arm B recovers less TOTAL rupees than Arm A at every tested beta_fatigue, and the shortfall (9.50% at the anchor) shrinks monotonically as beta_fatigue rises."
+    },
+    {
+      "id": "P5",
+      "claim": "Arm A and Arm B contact counts are byte-identical at every tested beta_fatigue and beta_incentive (Arm A exactly 20000 per seed; Arm B exactly its frozen per-seed value), because under world v1 no realized outcome feeds back into any admission, ranking, grant, deferral or denial."
+    },
+    {
+      "id": "P6",
+      "claim": "The 5-seed mean uplift ratio is monotonically non-increasing in beta_incentive across its three points."
+    }
+  ],
+
+  "falsifiers": [
+    {
+      "if": "P2 fails high (uplift at beta_fatigue = 0 is >= 1.70)",
+      "then": "The cross-agent fatigue externality contributes little or nothing to the headline result. Spec §8.6's claim that the fatigue term is 'the whole thesis expressed as arithmetic' would be OVERSTATED for this dataset, and the finding must be restated in README/ARCHITECTURE.md as a SELECTION result rather than a fatigue-internalisation result. Report it as a failed prediction; do not adjust the grid."
+    },
+    {
+      "if": "P2 fails low (uplift at beta_fatigue = 0 is < 1.30)",
+      "then": "Fatigue carries more of the result than the fifo ablation implied. Report the measured value; do not adjust the grid."
+    },
+    {
+      "if": "P3 fails (a crossing exists inside the range)",
+      "then": "Publish the crossing beta_fatigue as 'where SAMPARK stops winning' -- this is the spec §11 deliverable in its strongest form and is a POSITIVE outcome for the submission's credibility, not a negative one."
+    },
+    {
+      "if": "P1 or P6 fails (non-monotone trend)",
+      "then": "Suspect a harness bug before suspecting a real effect. Re-derive. If the harness is correct, report the non-monotonicity."
+    },
+    {
+      "if": "P5 fails (any contact count moves)",
+      "then": "STOP. The decision-invariance property this sweep design rests on is false, the sweep is not a pure re-observation, and every interpretation below is void."
+    }
+  ],
+
+  "prohibitions": [
+    "The grid may not be widened, narrowed or re-centred after any result is observed.",
+    "The primary metric may not be swapped after any result is observed.",
+    "A failed prediction is reported as failed and is never edited.",
+    "No parameter outside the two dimensions above may be varied to obtain a more favourable result.",
+    "sim/natural.py's NATURAL_MULTIPLIER_BY_ROOT_CAUSE and sim/environment.py's OPTOUT_BASE are frozen Phase 7 owner priors and are NOT swept: they were precommitted against the observed total-rupee gap, and sweeping them post hoc would be retroactive tuning."
+  ],
+
+  "excluded_dimensions": [
+    {
+      "parameter": "sampark.allocator.constants.CONTACT_CAP_24H / CONTACT_CAP_7D",
+      "excluded_because": "Both are module-scope imports inside PROTECTED Phase 4 files (sampark/policy/hard/contact_cap.py and sampark/budget/issuance.py) with no override parameter anywhere. Sweeping them would require editing a protected file. This is the most economically interesting knob in the system and Phase 4 protection forbids touching it; that exclusion is published in DISCLAIMER.md rather than worked around."
+    }
+  ]
+}
