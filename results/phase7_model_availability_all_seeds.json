@@ -1,0 +1,92 @@
+{
+  "7_f10": {
+    "seed": 7,
+    "fraction": 0.1,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 14,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 3.97
+  },
+  "7_f20": {
+    "seed": 7,
+    "fraction": 0.2,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 5,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 4.06
+  },
+  "42_f10": {
+    "seed": 42,
+    "fraction": 0.1,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 14,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 4.24
+  },
+  "42_f20": {
+    "seed": 42,
+    "fraction": 0.2,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 5,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 4.15
+  },
+  "101_f10": {
+    "seed": 101,
+    "fraction": 0.1,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 15,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 4.17
+  },
+  "101_f20": {
+    "seed": 101,
+    "fraction": 0.2,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 4,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 3.9
+  },
+  "2024_f10": {
+    "seed": 2024,
+    "fraction": 0.1,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 15,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 3.79
+  },
+  "2024_f20": {
+    "seed": 2024,
+    "fraction": 0.2,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 5,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 3.85
+  },
+  "31337_f10": {
+    "seed": 31337,
+    "fraction": 0.1,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 14,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 3.86
+  },
+  "31337_f20": {
+    "seed": 31337,
+    "fraction": 0.2,
+    "uplift_available": false,
+    "uplift_n_buckets_under_floor": 5,
+    "fatigue_available": true,
+    "fatigue_n_buckets": 32,
+    "elapsed_s": 3.74
+  }
+}

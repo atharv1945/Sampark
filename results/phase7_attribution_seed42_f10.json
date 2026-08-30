@@ -1,0 +1,15 @@
+{
+  "seed": 42,
+  "fraction": 0.1,
+  "n_credits": 18038,
+  "total_observed_recovered_paise": 1609423614,
+  "total_expected_natural_paise": 269069392,
+  "total_credited_recovery_paise": 1340354222,
+  "n_negative_credits": 13852,
+  "negative_tail_paise": -207579256,
+  "baseline_level_distribution": {
+    "source_root_cause": 16532,
+    "source": 1506
+  },
+  "arithmetic_check_passes": true
+}

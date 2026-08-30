@@ -49,9 +49,26 @@ class ModelBackedScorer:
     ever constructed by `build_scorer` after `artifact.is_valid_for_scoring()`
     has already been confirmed True — this class itself does not
     re-check validity per call, to keep the hot scoring path free of
-    per-candidate branching on artifact state."""
+    per-candidate branching on artifact state.
+
+    `p_hat_mode` (Phase 7 design lock, Decision 5) — `"level"` (default,
+    matches the ORIGINAL Phase 6 formula exactly: `p_hat = treated
+    response rate`) or `"uplift"` (`p_hat = treated - control`, the
+    causally correct quantity, since part of the treated rate would have
+    happened anyway). Shipped as two DISTINCT, explicitly-selected modes
+    rather than silently switching Phase 6's formula: `phase7_model`
+    (level) and `phase7_model_uplift` (uplift) are separate, named
+    ablations (`sim/arm_b_cli.py`), so the choice is measured, not argued.
+
+    Neither `treated_response_by_bucket` NOR `hazard_by_bucket` is ever
+    read with a silent `.get(key, 0.0)` default (Phase 7 design lock,
+    Part 7.2 — the exact defect that made an unseen bucket the MOST
+    attractive candidate to contact, backwards). A genuinely missing
+    bucket raises `KeyError`, exactly like `UpliftModel.predict_uplift`
+    already does — loud and honest, never silently wrong."""
 
     artifact: ModelArtifact
+    p_hat_mode: str = "level"
 
     def score(
         self,
@@ -65,14 +82,20 @@ class ModelBackedScorer:
                 "effective_incentive_bps must not exceed the requested ceiling: "
                 f"{effective_incentive_bps!r} > {candidate.request.requested_max_incentive_bps!r}"
             )
+        if self.p_hat_mode not in ("level", "uplift"):
+            raise ValueError(f"p_hat_mode must be 'level' or 'uplift', got {self.p_hat_mode!r}")
 
         source = candidate.risk_item.source
         root_cause = candidate.risk_item.root_cause
         model = self.artifact.uplift_model
         assert model is not None  # guaranteed by build_scorer's is_valid_for_scoring() gate
-        p_hat = model.treated_response_by_bucket.get(
-            (source, root_cause), model.control_response_by_bucket.get((source, root_cause), 0.0)
-        )
+
+        treated_rate = model.treated_response_by_bucket[(source, root_cause)]
+        if self.p_hat_mode == "level":
+            p_hat = treated_rate
+        else:
+            control_rate = model.control_response_by_bucket[(source, root_cause)]
+            p_hat = treated_rate - control_rate
 
         gross_paise = p_hat * candidate.risk_item.amount_paise
         incentive_expected_paise = gross_paise * effective_incentive_bps / 10_000
@@ -80,7 +103,7 @@ class ModelBackedScorer:
 
         hazard_model = self.artifact.fatigue_hazard_model
         assert hazard_model is not None  # same gate
-        hazard = hazard_model.hazard_by_bucket.get((source, root_cause, n), 0.0)
+        hazard = hazard_model.hazard_by_bucket[(source, root_cause, n)]
         future_count = LAMBDA_PER_CUSTOMER_DAY * FORWARD_HORIZON_DAYS
         v_forward_items = len(other_open_amounts_paise) + future_count
         v_forward = (
@@ -101,24 +124,31 @@ class ModelBackedScorer:
         )
 
 
-def build_scorer() -> Scorer:
+def build_scorer(module_name: str = "sampark.models.artifact_data", p_hat_mode: str = "level") -> Scorer:
     """The one factory Phase 6 evidence runs call. Never raises: any
     failure to obtain a valid model artifact is caught here and turned
     into the deterministic heuristic fallback, with the reason logged.
     Two independent calls with the same committed artifact always
     return the same kind of scorer — this function reads no wall clock
-    and no RNG."""
+    and no RNG.
+
+    `module_name` / `p_hat_mode` (Phase 7, additive — every pre-Phase-7
+    call site omits both and gets byte-identical Phase 6 behavior). The
+    Phase 7 evidence CLI passes `module_name="sampark.models.artifact_data_phase7"`
+    for the `phase7_model`/`phase7_model_uplift` ablations, and
+    `p_hat_mode="uplift"` for the latter only (Decision 5)."""
     try:
-        artifact = load_committed_artifact()
+        artifact = load_committed_artifact(module_name)
     except CommittedArtifactUnavailableError as exc:
-        logger.warning("Phase 6 model artifact unavailable, falling back to HeuristicScorer: %s", exc)
+        logger.warning("Model artifact (%s) unavailable, falling back to HeuristicScorer: %s", module_name, exc)
         return default_scorer()
 
     if not artifact.is_valid_for_scoring():
         logger.warning(
-            "Phase 6 model artifact present but not valid for scoring "
+            "Model artifact (%s) present but not valid for scoring "
             "(uplift_available=%s, fatigue_hazard_available=%s) -- falling back to HeuristicScorer. "
             "uplift_reason=%r fatigue_hazard_reason=%r",
+            module_name,
             artifact.uplift_available,
             artifact.fatigue_hazard_available,
             artifact.uplift_reason,
@@ -126,7 +156,7 @@ def build_scorer() -> Scorer:
         )
         return default_scorer()
 
-    return ModelBackedScorer(artifact=artifact)
+    return ModelBackedScorer(artifact=artifact, p_hat_mode=p_hat_mode)
 
 
 __all__ = ["ModelBackedScorer", "build_scorer", "HeuristicScorer"]

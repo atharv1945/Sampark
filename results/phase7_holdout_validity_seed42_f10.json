@@ -1,0 +1,26 @@
+{
+  "seed": 42,
+  "fraction": 0.1,
+  "holdout_estimate": {
+    "rate": 0.0509683995922528,
+    "n": 1962,
+    "wilson_ci_95": [
+      0.042083986882282404,
+      0.06160778563896244
+    ]
+  },
+  "arm_h_ground_truth": {
+    "rate": 0.05285,
+    "n": 20000
+  },
+  "arm_h_within_holdout_ci": true,
+  "balance": {
+    "n_customers_total": 4913,
+    "n_held_out_f10": 490,
+    "n_held_out_f20": 980,
+    "nested_f10_subset_of_f20": true,
+    "mean_amount_paise_held_out": 1586270.7632653061,
+    "mean_amount_paise_treated": 1576952.5799231292,
+    "standardized_mean_difference": -0.0074077677895522005
+  }
+}

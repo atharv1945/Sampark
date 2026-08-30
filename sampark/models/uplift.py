@@ -40,7 +40,12 @@ import collections
 from dataclasses import dataclass
 from typing import Sequence
 
-from sampark.models.training_data import TrainingRow, load_training_rows
+from sampark.models.training_data import (
+    TrainingRow,
+    TreatmentArm,
+    load_training_rows,
+    load_training_rows_with_holdout,
+)
 
 _MIN_OBS_PER_ARM = 30  # a floor low enough to be honest about being a floor, not a target
 
@@ -197,3 +202,169 @@ def train_uplift_model(seed: int) -> UpliftModelResult:
     rows = load_training_rows(seed)
     model = fit_uplift_model(rows, is_treated=lambda r: r.incentive_bps > 0)
     return UpliftModelResult(available=True, reason=None, report=report, model=model)
+
+
+# =============================================================================
+# Phase 7 — holdout-aware path (spec §8.9). A SEPARATE set of functions,
+# never modifying detect_treatment_control_split / train_uplift_model above
+# (Phase 6's exact behavior, and hence sampark/models/artifact_data.py's
+# committed content, is unaffected by anything below this line).
+#
+# _MIN_OBS_PER_ARM_HOLDOUT = 200 (raised from the pre-Phase-7 30 above,
+# which was declared but NEVER ACTUALLY ENFORCED anywhere in this module —
+# Phase 7 design lock, Decision 12) mirrors sim/calibration.py's own
+# committed precedent (_DECAY_MIN_BUCKET_OBS = 200) rather than inventing a
+# new number.
+# =============================================================================
+
+_MIN_OBS_PER_ARM_HOLDOUT = 200
+
+
+def _n_by_bucket(rows: Sequence[TrainingRow]) -> dict[tuple[str, str], int]:
+    counts: dict[tuple[str, str], int] = collections.defaultdict(int)
+    for row in rows:
+        counts[(row.source, row.root_cause)] += 1
+    return dict(counts)
+
+
+def _bucket_rate(rows: Sequence[TrainingRow], bucket: tuple[str, str]) -> float | None:
+    subset = [r for r in rows if (r.source, r.root_cause) == bucket]
+    if not subset:
+        return None
+    return sum(1 for r in subset if r.recovered) / len(subset)
+
+
+@dataclass(frozen=True)
+class HoldoutTreatmentControlReport:
+    """Phase 7's holdout-aware adequacy report — a SEPARATE type from
+    `TreatmentControlReport` above, because the checks it runs are
+    genuinely different: real randomized `TreatmentArm` labels (Phase 7
+    design lock, Decision 15's hard restriction: control rows come ONLY
+    from `sim.holdout`-derived customers, never from an
+    allocator-declined item) instead of the incentive-collinearity /
+    uncontacted-fraction proxies Phase 6 had to rely on before a holdout
+    existed."""
+
+    fraction: float
+    n_treated_by_bucket: dict[tuple[str, str], int]
+    n_control_by_bucket: dict[tuple[str, str], int]
+    degenerate_buckets: tuple[tuple[str, str], ...]  # control rate exactly 0.0 or 1.0
+    has_uncontacted_control: bool
+    meets_min_obs_floor: bool
+    under_floor_buckets: dict[tuple[str, str], tuple[int, int]]  # bucket -> (n_treated, n_control)
+
+
+def detect_treatment_control_split_holdout(seed: int, fraction: float) -> HoldoutTreatmentControlReport:
+    """Runs the Phase 7 adequacy checks against `load_training_rows_with_holdout`'s
+    real TREATED/HOLDOUT split. Never raises — `train_uplift_model_holdout`
+    decides what to do with the report; this function only measures."""
+    rows = load_training_rows_with_holdout(seed, fraction)
+    treated = [r for r in rows if r.treatment_arm is TreatmentArm.TREATED]
+    control = [r for r in rows if r.treatment_arm is TreatmentArm.HOLDOUT]
+
+    n_treated = _n_by_bucket(treated)
+    n_control = _n_by_bucket(control)
+    buckets = sorted(set(n_treated) | set(n_control))
+
+    degenerate = [b for b in buckets if _bucket_rate(control, b) in (0.0, 1.0)]
+    under_floor = {
+        b: (n_treated.get(b, 0), n_control.get(b, 0))
+        for b in buckets
+        if n_treated.get(b, 0) < _MIN_OBS_PER_ARM_HOLDOUT or n_control.get(b, 0) < _MIN_OBS_PER_ARM_HOLDOUT
+    }
+
+    return HoldoutTreatmentControlReport(
+        fraction=fraction,
+        n_treated_by_bucket=n_treated,
+        n_control_by_bucket=n_control,
+        degenerate_buckets=tuple(degenerate),
+        has_uncontacted_control=len(control) > 0,
+        meets_min_obs_floor=bool(buckets) and not under_floor,
+        under_floor_buckets=under_floor,
+    )
+
+
+@dataclass(frozen=True)
+class UpliftModelResultHoldout:
+    available: bool
+    reason: str | None
+    report: HoldoutTreatmentControlReport
+    model: UpliftModel | None = None
+
+
+def train_uplift_model_holdout(seed: int, fraction: float) -> UpliftModelResultHoldout:
+    """The Phase 7 entry point `sampark.models.artifact.build_model_artifact`
+    calls when `fraction > 0`. Mirrors `train_uplift_model`'s
+    never-fabricate-a-split discipline exactly, against the real holdout
+    instead of a proxy. `is_treated=lambda r: r.treatment_arm is
+    TreatmentArm.TREATED` — NEVER the collinear `incentive_bps > 0` proxy
+    `train_uplift_model` above was forced to use as a placeholder for the
+    unreachable branch; that proxy is retired here in favor of the real
+    label the holdout finally provides."""
+    report = detect_treatment_control_split_holdout(seed, fraction)
+
+    if not report.has_uncontacted_control:
+        return UpliftModelResultHoldout(
+            available=False,
+            reason=f"fraction={fraction!r} produced zero HOLDOUT rows — no control population exists",
+            report=report,
+            model=None,
+        )
+
+    if not report.meets_min_obs_floor:
+        return UpliftModelResultHoldout(
+            available=False,
+            reason=(
+                f"one or more (source, root_cause) buckets fall below the "
+                f"{_MIN_OBS_PER_ARM_HOLDOUT}-observation floor in at least one arm "
+                f"(bucket -> (n_treated, n_control)): {report.under_floor_buckets!r}"
+            ),
+            report=report,
+            model=None,
+        )
+
+    if report.degenerate_buckets:
+        return UpliftModelResultHoldout(
+            available=False,
+            reason=f"degenerate (0%% or 100%%) control-arm recovery rate in buckets: {report.degenerate_buckets!r}",
+            report=report,
+            model=None,
+        )
+
+    rows = load_training_rows_with_holdout(seed, fraction)
+    model = fit_uplift_model(rows, is_treated=lambda r: r.treatment_arm is TreatmentArm.TREATED)
+    return UpliftModelResultHoldout(available=True, reason=None, report=report, model=model)
+
+
+def evaluate_uplift_model_holdout(
+    model: UpliftModel, seed: int, fraction: float
+) -> dict[tuple[str, str], dict[str, float]]:
+    """Out-of-sample evaluation (Phase 7 design lock, §D.3: train on seed
+    42 only, evaluate on 7/101/2024/31337). For each `(source, root_cause)`
+    bucket present in BOTH `model` and the evaluation seed's own real
+    holdout split, compares `model.predict_uplift(...)` (fit on the
+    TRAINING seed) against the REALIZED uplift on THIS seed's own data
+    (`treated_rate - control_rate`, both freshly measured here, never
+    read from `model`). Returns `{bucket: {"predicted": ..., "realized":
+    ..., "abs_error": ...}}` — the caller (sim/train_phase7_models.py)
+    aggregates this into a single reported MAE, never a single bucket
+    cherry-picked to look good."""
+    rows = load_training_rows_with_holdout(seed, fraction)
+    treated = [r for r in rows if r.treatment_arm is TreatmentArm.TREATED]
+    control = [r for r in rows if r.treatment_arm is TreatmentArm.HOLDOUT]
+
+    buckets = sorted(set(model.treated_response_by_bucket) & set(model.control_response_by_bucket))
+    result: dict[tuple[str, str], dict[str, float]] = {}
+    for bucket in buckets:
+        treated_rate = _bucket_rate(treated, bucket)
+        control_rate = _bucket_rate(control, bucket)
+        if treated_rate is None or control_rate is None:
+            continue
+        predicted = model.predict_uplift(*bucket)
+        realized = treated_rate - control_rate
+        result[bucket] = {
+            "predicted": predicted,
+            "realized": realized,
+            "abs_error": abs(predicted - realized),
+        }
+    return result

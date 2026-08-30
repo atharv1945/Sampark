@@ -1,0 +1,62 @@
+{
+  "arm": "B",
+  "seed": 42,
+  "ablation": "phase7_model",
+  "backend": "postgres",
+  "aging_bonus_paise": 11070,
+  "merchant_budget_paise_per_window": 3679105,
+  "fifo_mode": false,
+  "scorer": "HeuristicScorer",
+  "constants_commit_sha": "fe45cefe26f763e1305ce648e944e41aeb556b41",
+  "ablation_note": "sampark.models.scorer.build_scorer(module_name='sampark.models.artifact_data_phase7', p_hat_mode='level') against the Phase 7 committed artifact (sim/train_phase7_models.py, seed 42, holdout fraction 0.10). On this dataset uplift reports available=False (most (source, root_cause) buckets fall below the 200-observation floor in the holdout control arm) even though fatigue-hazard reports available=True -- the all-or-nothing gate (both required) falls back to HeuristicScorer, reproducing headline exactly. This is the honest Phase 7 result, not a bug in the ablation. NOTE: this ablation runs the STANDARD (non-holdout) sim.arm_b.run_arm_b -- it tests whether the COMMITTED MODEL (trained separately, on Arm A-H) changes SCORING behavior when applied to headline candidates; it does not itself introduce a holdout into this run.",
+  "compliance": {
+    "quiet_hour_violations": 0,
+    "contact_cap_24h_breaches": 0,
+    "contact_cap_7d_breaches": 0,
+    "customers_contacted_3plus_per_24h": 0,
+    "conflicting_action_incidents": 0,
+    "interlock_dispute_open_violations": 0,
+    "fact_unavailable_counts": {
+      "fact_unavailable.rto_flag": 1756,
+      "fact_unavailable.refund_in_flight": 4356,
+      "fact_unavailable.fraud_review": 4395,
+      "fact_unavailable.mandate_cancellation": 2639,
+      "fact_unavailable.consent_scope": 10299
+    },
+    "post_optout_contacts": null,
+    "consent_scope_violations": null,
+    "scope_violation_count": 0
+  },
+  "recovery_unit": "risk_item",
+  "total_contacts": 10299,
+  "total_recoveries": 2691,
+  "recovered_amount_paise": 1593664601,
+  "incentive_spend_paise": 18363386,
+  "recovered_amount_per_contact_paise": 154739.74181959414,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 1717,
+      "recoveries": 490,
+      "recovered_amount_paise": 183550925,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 1756,
+      "recoveries": 498,
+      "recovered_amount_paise": 259232882,
+      "incentive_spend_paise": 12961430
+    },
+    "mandate_recovery_agent": {
+      "contacts": 2639,
+      "recoveries": 667,
+      "recovered_amount_paise": 270114423,
+      "incentive_spend_paise": 5401956
+    },
+    "receivables_agent": {
+      "contacts": 4187,
+      "recoveries": 1036,
+      "recovered_amount_paise": 880766371,
+      "incentive_spend_paise": 0
+    }
+  }
+}

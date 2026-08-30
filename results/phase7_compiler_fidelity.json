@@ -1,0 +1,104 @@
+{
+  "canonical": {
+    "total": 9,
+    "passed": 9
+  },
+  "paraphrase": {
+    "total": 4,
+    "passed": 4
+  },
+  "cases": [
+    {
+      "case_id": "spec_no_more_than_twice_24h",
+      "kind": "canonical",
+      "expected": "REJECTED",
+      "actual": "REJECTED",
+      "match": true
+    },
+    {
+      "case_id": "spec_no_voice_before_10am",
+      "kind": "canonical",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "match": true
+    },
+    {
+      "case_id": "spec_no_discount_after_chargeback",
+      "kind": "canonical",
+      "expected": "FACT_UNAVAILABLE",
+      "actual": "FACT_UNAVAILABLE",
+      "match": true
+    },
+    {
+      "case_id": "spec_stop_recovery_on_rto_flag",
+      "kind": "canonical",
+      "expected": "FACT_UNAVAILABLE",
+      "actual": "FACT_UNAVAILABLE",
+      "match": true
+    },
+    {
+      "case_id": "no_whatsapp_more_than_once_7d",
+      "kind": "canonical",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "match": true
+    },
+    {
+      "case_id": "no_sms_after_9pm",
+      "kind": "canonical",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "match": true
+    },
+    {
+      "case_id": "never_channel_voice",
+      "kind": "canonical",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "match": true
+    },
+    {
+      "case_id": "paraphrase_twice_daily_cap",
+      "kind": "paraphrase",
+      "expected": "REJECTED",
+      "actual": "REJECTED",
+      "match": true
+    },
+    {
+      "case_id": "paraphrase_morning_quiet_voice",
+      "kind": "paraphrase",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "match": true
+    },
+    {
+      "case_id": "paraphrase_chargeback_discount_ban",
+      "kind": "paraphrase",
+      "expected": "FACT_UNAVAILABLE",
+      "actual": "FACT_UNAVAILABLE",
+      "match": true
+    },
+    {
+      "case_id": "paraphrase_mandate_intent_stop",
+      "kind": "paraphrase",
+      "expected": "ACCEPTED",
+      "actual": "ACCEPTED",
+      "match": true
+    },
+    {
+      "case_id": "redundant_five_per_day",
+      "kind": "canonical",
+      "expected": "REJECTED",
+      "actual": "REJECTED",
+      "match": true
+    },
+    {
+      "case_id": "out_of_grammar_bad_channel",
+      "kind": "canonical",
+      "expected": "REJECTED",
+      "actual": "REJECTED",
+      "match": true
+    }
+  ],
+  "note": "This measures the DETERMINISTIC pipeline (parse+validate) against hand-authored expected IRs -- the English->IR LLM step itself was not exercised (no ANTHROPIC_API_KEY configured this session; see sampark/policy/compiler/llm.py)."
+}

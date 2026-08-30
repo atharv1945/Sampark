@@ -277,10 +277,21 @@ class VerificationReport:
     first_divergence: Divergence | None
     head_hash: str | None
     missing_grant_reservations: tuple[uuid.UUID, ...]
+    # Phase 7 (spec §8.9), additive: every attribution_credits row must
+    # have a matching recovery.credited event. Empty tuple both when
+    # nothing is missing AND when attribution_credits does not exist on
+    # this connection (the schema proposal has not been applied — never
+    # a verification failure by itself; see _missing_credit_reconciliations).
+    missing_credit_reconciliations: tuple[uuid.UUID, ...] = ()
 
     @property
     def ok(self) -> bool:
-        return self.linkage_ok and self.genesis_ok and not self.missing_grant_reservations
+        return (
+            self.linkage_ok
+            and self.genesis_ok
+            and not self.missing_grant_reservations
+            and not self.missing_credit_reconciliations
+        )
 
     def summary(self) -> str:
         lines = [
@@ -299,6 +310,11 @@ class VerificationReport:
             lines.append(
                 f"MISSING grant.reserved events for grant_ids: "
                 f"{[str(g) for g in self.missing_grant_reservations]}"
+            )
+        if self.missing_credit_reconciliations:
+            lines.append(
+                f"MISSING recovery.credited events for grant_ids: "
+                f"{[str(g) for g in self.missing_credit_reconciliations]}"
             )
         lines.append(f"VALID: {self.ok}")
         return "\n".join(lines)
@@ -322,12 +338,36 @@ def _missing_grant_reservations(conn: psycopg.Connection) -> tuple[uuid.UUID, ..
         return tuple(row[0] for row in cur.fetchall())
 
 
+def _missing_credit_reconciliations(conn: psycopg.Connection) -> tuple[uuid.UUID, ...]:
+    """Phase 7 (spec §8.9), mirroring `_missing_grant_reservations`'s exact
+    pattern: every `attribution_credits` row must have a corresponding
+    `recovery.credited` event keyed by grant_id. Returns `()` (never a
+    failure) if `attribution_credits` does not exist at all on this
+    connection's search_path — the Phase 7 schema proposal is an owner
+    decision (CLAUDE.md §3) and a fresh checkout without it applied must
+    not have its audit verification fail because of a table that was
+    never supposed to exist there yet."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT to_regclass('attribution_credits')")
+        if cur.fetchone()[0] is None:
+            return ()
+        cur.execute(
+            "SELECT c.grant_id FROM attribution_credits c "
+            "WHERE NOT EXISTS ("
+            "  SELECT 1 FROM audit_events a "
+            "  WHERE a.event_type = 'recovery.credited' "
+            "    AND a.payload ->> 'grant_id' = c.grant_id::text"
+            ") ORDER BY c.grant_id"
+        )
+        return tuple(row[0] for row in cur.fetchall())
+
+
 def verify_chain(conn: psycopg.Connection) -> VerificationReport:
     """The verification algorithm (Phase 5A §5.3): recompute every hash,
-    check linkage, check genesis, check the grant reconciliation. NEVER
-    writes anything — a verification failure is reported, never appended
-    to the chain it is inspecting (Phase 5A §6.2's failure-mode
-    boundary)."""
+    check linkage, check genesis, check the grant reconciliation (and,
+    Phase 7, the attribution-credit reconciliation). NEVER writes
+    anything — a verification failure is reported, never appended to the
+    chain it is inspecting (Phase 5A §6.2's failure-mode boundary)."""
     require_migration(conn)
     events = all_events_ordered(conn)
 
@@ -352,9 +392,11 @@ def verify_chain(conn: psycopg.Connection) -> VerificationReport:
         last_hash = digest
 
     missing = _missing_grant_reservations(conn)
+    missing_credits = _missing_credit_reconciliations(conn)
 
     return VerificationReport(
         event_count=len(events), genesis_ok=genesis_ok, linkage_ok=linkage_ok,
         first_divergence=first_divergence, head_hash=last_hash,
         missing_grant_reservations=missing,
+        missing_credit_reconciliations=missing_credits,
     )

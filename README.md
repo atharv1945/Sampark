@@ -184,10 +184,14 @@ not by recovering more money overall. The locked gate is ₹/contact
 here so it is not discovered later as an omission.
 
 **Evidence durability, stated plainly:** `results/*.json` (20 metrics
-files + 4 gate files backing the table above) is currently gitignored —
-durable only in the local working tree that produced it, not in git. This
-conflicts with the precommitment device's own premise (Design Lock
-§13.4) and is an open owner decision; see `CLAUDE.md` §15.
+files + 4 gate files backing the table above) was gitignored at Phase 4
+close — durable only in the local working tree, not in git — which
+conflicted with the precommitment device's own premise (Design Lock
+§13.4). **Closed in the Phase 7 session** (Phase 7 design-lock Decision
+11): `.gitignore` now tracks `results/*.json`, `.gitattributes` pins it
+to LF so `core.autocrlf=true` cannot make the same evidence
+byte-different across platforms, and the full Phase 4 + Phase 6 record
+is staged. See `CLAUDE.md` §15 for commit status.
 
 ### Known gap, stated plainly
 
@@ -211,15 +215,14 @@ The audit chain (Phase 5), uplift/fatigue models (Phase 6), holdout
 attribution (Phase 7), the LLM policy compiler (Phase 7), the UI (Phase
 8), and the chaos panel (Phase 8). None of these are implemented here.
 
-### CI/Postgres gap
+### CI/Postgres gap — CLOSED (owner-applied since this section was written)
 
-`.github/workflows/ci.yml` has no PostgreSQL service (Design Lock §17.3,
-owner-applied, not yet applied). Locally, the full suite is **542 passed,
-3 skipped** (Redis-only, legitimate) with Postgres configured; without it
-(what CI sees today), it is **481 passed, 64 skipped**, including
-`tests/test_concurrent_grant_issuance.py`. See
-`CI_POSTGRES_SERVICE_PROPOSAL.md` for the exact proposed diff — not
-applied, per the same file-ownership rule.
+`.github/workflows/ci.yml` had no PostgreSQL service at Phase 4 close
+(Design Lock §17.3). **This is now applied**: CI runs a `postgres:16`
+service and a schema-apply step, per `CI_POSTGRES_SERVICE_PROPOSAL.md`
+(retained as the durable record of the reviewed proposal). See the
+Phase 6 section below for current suite counts, which supersede the
+542/481+64 figures reported here at Phase 4 close.
 
 ## Phase 5 — Audit & Explainability
 
@@ -387,3 +390,257 @@ deliberate, labeled live-store demonstration run as part of this
 phase's verification — see the completion report for its exact
 request_id/grant_id and the `python -m sampark.audit.verify` output
 before and after).
+
+## Phase 6 — Intelligence layer
+
+Adds a model-agnostic scorer seam behind the allocator, a T-learner
+uplift model and a fatigue-hazard model (both implemented and tested as
+real, working infrastructure), isotonic calibration, and an exact
+per-window optimality-gap measurement — per spec §18.1's Phase 6 exit
+criterion: *"Models beat the heuristic — or are honestly reported as not
+doing so, with the ablation committed."*
+
+**Result: the honest-non-improvement branch, not the models-win branch.**
+Both models report `available=False` on this dataset, for concrete,
+structural, non-tunable reasons — not a training failure.
+
+### What's in
+
+- `sampark/allocator/scorer.py` — `Scorer` protocol + `HeuristicScorer`,
+  wrapping `sampark.allocator.scoring.score` verbatim. `HARD_RULES`,
+  `sampark.allocator.greedy`, and every pre-Phase-6 call site are
+  behaviourally unaffected (`scorer=None` constructs the identical
+  heuristic).
+- `sampark/models/uplift.py` — a genuine T-learner (`fit_uplift_model`),
+  exercised against synthetic treated/control data in
+  `tests/models/test_uplift.py`. `train_uplift_model(seed=42)` reports
+  `available=False`: every eligible RiskItem is contacted by its
+  matching Phase 2 agent exactly once (max uncontacted fraction
+  observed: 0.0000), so there is no untreated population, and
+  `incentive_bps` is a fixed per-agent constant within each source, so
+  there is no incentive-level split either. A T-learner needs real
+  treated/control variation, which requires a holdout arm — Phase 7.
+- `sampark/models/fatigue_hazard.py` — same shape. `agents.types.ContactOutcome`
+  carries no opt-out field, and `sim/ledger.py` constructs every
+  `ContactState` with `optouts_by_channel={}`, unwritten by any
+  generator code — no real opt-out signal exists in this dataset.
+- `sampark/models/calibration.py` — a thin, deterministic
+  `sklearn.isotonic.IsotonicRegression` wrapper, tested on its own
+  synthetic data. Not yet wired into `ModelBackedScorer` — nothing real
+  reaches it while both upstream models report unavailable.
+- `sampark/models/scorer.py::build_scorer()` — the one fallback decision
+  point, made once at construction: a missing or invalid model artifact
+  → `HeuristicScorer`, reason logged at WARNING. Never raises.
+- `sim/optimality_gap.py` — an exact per-window multiple-choice-knapsack
+  DP (no external solver — CLAUDE.md §2), tested against brute force
+  (`tests/sim_optimality_gap/`, 8/8 passing).
+
+### Evidence status
+
+`phase6_heuristic` (the new scorer seam, run as the frozen
+`HeuristicScorer`) reproduces the Phase 4 headline **exactly** —
+bit-for-bit on every reported metric — across all five precommitted
+seeds. This is the regression proof for the new seam, not new evidence
+of an improvement. `phase6_model` (`build_scorer()` against the
+committed artifact) falls back to the same heuristic for the same
+honest reason and also reproduces the headline exactly. **No unsupported
+ML improvement is claimed anywhere in this evidence.**
+
+Optimality gap (seed 42, top-5 windows by admitted ceiling): mean gap
+ratio ≈0.9996 / worst-case ≈0.9994 at headline merchant-margin capacity;
+≈0.9994 / worst-case ≈0.9985 at half capacity (an artificial stress
+test — headline capacity rarely binds). I.e. the shipped greedy
+allocator is empirically within ~0.05–0.15% of the measured per-window
+optimum — a lower bound on the true achievable optimum, since the DP
+does not itself search incentive downgrades (see the module docstring
+for the exact caveats: per-window not whole-horizon, no downgrade
+search inside the DP).
+
+**Gate summaries for both Phase 6 ablations** (`results/gate_phase6_heuristic.json`,
+`results/gate_phase6_model.json`) were generated in the Phase 7 session,
+closing the "with the ablation committed" gap — see "Evidence commit
+status" below.
+
+### Known failure/recovery incident
+
+Mid-evidence-run, the host `C:` drive filled to 100% free space, crashing
+Docker Desktop and severing the live Postgres connection the run was
+using. `sim/arm_b.py`'s per-run cleanup needs a live connection to reset
+its own transactional rows, so it never ran, leaving 399 orphaned rows;
+the next rerun's registry cleanup then failed on an FK constraint. Fixed
+by extending `run_phase6_evidence.sh`'s cleanup to also clear the same
+tables `_cleanup_postgres_run` already documents as safe. Two further
+self-inflicted false starts on the same rerun (forgetting to activate
+`.venv`; a fresh shell missing `.env`'s Postgres vars) were fixed the
+same session.
+
+### Evidence commit status
+
+At Phase 6 close, `results/*.json` was gitignored despite the exit
+criterion's "with the ablation committed" — a version-control gap, not
+an engineering one; the models were correctly implemented, correctly
+gated, and honestly reported. **Closed in the Phase 7 session**: the
+`.gitignore` rule was replaced, `.gitattributes` pins `results/*.json`
+to LF, and the two missing gate summaries were generated by pure read of
+already-existing result files (no re-run). 45 files staged; see
+`CLAUDE.md` §15 for commit status.
+
+### Test suite (current, superseding the Phase 4/5 counts reported in
+their own sections above)
+
+Full repository suite with Postgres configured, CI's `postgres:16`
+service now applied, and the U-1 audit migration folded into
+`sampark/schema.sql`: **588 passed, 3 skipped** (the 3 are
+`tests/budget/test_precheck.py`'s Redis-only tests — `redis` is
+deliberately not a project dependency). `python -m sampark.audit.verify`:
+`VALID: True`, 560 events, `genesis_ok: True`, `linkage_ok: True` — the
+audit chain was not disturbed by Phase 6 work.
+
+## Phase 7 — Attribution & policy compiler
+
+Implements spec §8.9 (holdout, natural recovery, credited-recovery
+ledger) and §8.4 (English → PolicyIR → deterministic compiled rule).
+**Status: engineering closed — implemented, tested against real
+PostgreSQL, and evidenced at the scope documented below (single seed for
+the `phase7_*` Arm B ablations, no live LLM compile — both explicit,
+stated scope reductions, not gaps). Design decisions and evidence are
+recorded in `DECISIONS.md`'s Phase 7 entry; the Phase 6 evidence and
+this phase's implementation are committed. Phase 8 (demo surface) and
+Phase 9 (sensitivity sweep, final A/B/H table, `ARCHITECTURE.md`,
+`DISCLAIMER.md`) are deferred and have not been started.**
+
+### World v2 and the holdout
+
+`sim/holdout.py` — deterministic, customer-level assignment (SHA-256
+hash-rank within amount-at-risk quintile strata; no RNG). At seed 42:
+4,913 real customers, 490 held out at f=0.10 (nested inside 980 held out
+at f=0.20), standardized mean difference in amount-at-risk **-0.0074**
+(near-perfect balance).
+
+`sim/environment.py` gains `world="v1"|"v2"` (default `"v1"`, byte-
+identical to every pre-Phase-7 caller) and two independent RNG
+namespaces for opt-out labels and natural recovery. Proven, at real
+20k-item scale, that the response-model draw sequence is untouched by
+world v2's existence (`tests/sim_environment/test_world_v2.py`), and
+that `world="v1"` reproduces `sim.arm_a.run_arm_a` bit-for-bit
+(`tests/sim_arm_a_holdout/`).
+
+### Natural recovery / Decision 17 precommitment
+
+`sim/natural.py`'s multiplier table (owner-authored prior; every value
+in `[0.05, 0.40]`, `unknown` strictly interior, locked ordering) was
+committed before any world-v2 evidence ran. A closed-form prediction
+for Arm A-H (seed 42, f=0.10) — computable in advance because Arm A's
+uncontacted set is exactly the held-out customers — was computed as
+**30,658,277 paise** over 1,962 items; the realized outcome was
+**31,947,441 paise** (4.2% relative error, consistent with sampling
+noise around the predicted expectation). See
+`results/phase7_decision17_precommitment_seed42_f10.json`.
+
+### Holdout validity (seed 42, f=0.10)
+
+The production-realistic holdout estimate (5.10%, n=1,962, 95% Wilson
+CI **[4.21%, 6.16%]**) is validated against Arm H's full-population
+ground-truth counterfactual (5.29%, n=20,000) — **the ground truth falls
+inside the holdout's confidence interval.** Arm H is used only for this
+validation, never to compute a production credit (`results/phase7_holdout_validity_seed42_f10.json`).
+
+### Attribution (seed 42, f=0.10, from real Arm A-H data)
+
+18,038 credits computed; the database-style arithmetic invariant
+(`credited = observed − expected_natural`) holds for every one. 16,532
+resolve at `source_root_cause` baseline precision, 1,506 at `source`.
+13,852 credits are negative (an unrecovered contact against a positive
+baseline) — **not clamped**, contributing a real -207,579,256 paise tail
+to the total (`results/phase7_attribution_seed42_f10.json`). The
+Postgres-backed ledger (`sampark/attribution/`, schema proposal only —
+`sampark/schema.sql` untouched, CLAUDE.md §3) is proven against real
+PostgreSQL in an isolated schema: the arithmetic `CHECK` constraint
+rejects a deliberately unbalanced row, the `UNIQUE` constraint rejects a
+second credit for one grant, and idempotent retry/conflict semantics
+both hold (`tests/sampark_attribution/test_store.py`, 6/6 passing).
+
+### Uplift and fatigue-hazard models
+
+At seed 42, f=0.10: **uplift remains unavailable** — most
+`(source, root_cause)` buckets fall below the 200-observation floor in
+the control arm (raised from Phase 6's declared-but-never-enforced 30).
+At f=0.20, 5 of 16 buckets are still under floor. **The fatigue-hazard
+model IS available** — the first Phase 6/7 model to clear its adequacy
+gate — with every `(source, root_cause, n)` bucket resolved through a
+hierarchical, shrunk fallback (no bucket ever priced at the old
+anti-conservative silent zero); every bucket in this run resolved at
+`source` or `global` level (0 at `source_root_cause`), matching the
+advance prediction that the person-level `fatigue_hazard` parameter
+carries no source/root-cause signal by construction. `sampark/models/artifact_data_phase7.py`
+(committed, generated) therefore reports `is_valid_for_scoring() = False`
+— Phase 7's all-or-nothing gate (both components required) correctly
+falls back to `HeuristicScorer`, exactly as `phase6_model` does, for a
+different and more specific reason.
+
+### Policy compiler
+
+Full deterministic pipeline (English-authored IR → grammar/bounds/fact-
+availability/conflict validation → rule-function generation → back-
+rendering) implemented and tested against a 13-case golden corpus (9
+canonical + 4 paraphrase, **13/13** reaching their expected verdict —
+`results/phase7_compiler_fidelity.json`). Includes both spec §8.4
+example sentences that reference facts this system does not have (the
+90-day chargeback rule, the RTO Shield rule) — both correctly compile to
+`FACT_UNAVAILABLE`, never silently admitted or denied. One deliberately
+wrong rule is demonstrated failing its generated test
+(`tests/policy/compiler/test_generate.py`), proving the activation gate
+is real. `sampark.policy.compiled.composed_hard_rules()` is proven
+byte-identical to the frozen 11 `HARD_RULES` when the activation set is
+empty (`tests/policy/test_activation_empty_in_protected_evidence.py`) —
+the state every Phase 4/6 evidence run sees. **The live English→IR LLM
+call was not exercised**: `.env`'s `ANTHROPIC_API_KEY` is present but
+empty in this environment, and `sampark/policy/compiler/llm.py` fails
+loudly rather than fabricating a response (CLAUDE.md §8) — the golden
+corpus's expected IRs are hand-authored, proving the deterministic half
+of the pipeline independent of a live model call.
+
+### Phase 4 protection
+
+`git diff aa87123 HEAD -- sampark/allocator/constants.py sampark/allocator/calibrated.py sampark/budget/issuance.py sampark/policy/`
+is empty throughout Phase 7. `python -m sim.gate` still reports
+**PASS** with the identical headline (mean A 89,387.38 / mean B
+156,957.37 paise, uplift 1.7114–1.8822×, `constants_commit_sha
+aa87123aafdc9d812f5a01c04766c60b9198a2ce`) after every Phase 7 change in
+this session, including a ~108-minute real Postgres-backed Arm B-H
+evidence run.
+
+### Attribution → audit wiring, and the official CLI
+
+`sampark/attribution/store.py::insert_credit()` emits `recovery.credited`
+from the actual credit-creating operation (optional `audit_sink`/`request`
+params, both `None` by default) — after the row is verified durable,
+never before, and from the verified row rather than the caller's
+argument, so a retry can never desynchronize the ledger and the audit
+trail. Proven with 3 real-Postgres integration tests
+(`tests/sampark_attribution/test_attribution_audit_integration.py`):
+the event is emitted, a retry does not duplicate it, and omitting the
+sink (every pre-existing caller) emits nothing.
+
+`sim/arm_b_cli.py` — the official evidence runner — gained three
+ablations: `phase7_heuristic`, `phase7_model`, `phase7_model_uplift`.
+Run once each against real PostgreSQL at seed 42: all three reproduce
+the frozen headline **exactly**, each for a distinct, honest reason
+(`phase7_heuristic`: the same `HeuristicScorer`; the two model ablations:
+the committed Phase 7 artifact's all-or-nothing gate falling back to
+`HeuristicScorer` because uplift is structurally unavailable on this
+data). The full 5-seed × 3-ablation matrix was not run — one real run
+measured at 48 minutes makes the full matrix ~12 hours, disproportionate
+for confirming a code-path property (identical scorer/fallback logic)
+that does not vary by seed.
+
+`tests/audit/test_world_v2_does_not_affect_audit_generation.py` proves
+world v2 cannot perturb audit-event generation or `prev_hash`: none of
+the 11 pre-Phase-7 `sampark.audit.emit.event_for_*` functions accept a
+`world` parameter or reference a world-v2-only type.
+
+Final full regression this session (`python -m pytest -q`, run after
+every change above): **779 passed, 3 skipped**, exit 0. The concurrency
+test (`tests/test_concurrent_grant_issuance.py`) and `python -m sampark.audit.verify`
+(`VALID: True`, 560 events) were both re-confirmed standalone
+afterward.

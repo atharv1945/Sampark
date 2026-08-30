@@ -1,0 +1,50 @@
+{
+  "arm": "A-H",
+  "seed": 31337,
+  "fraction": 0.1,
+  "assignment_version": 1,
+  "holdout_customer_count": 490,
+  "holdout_customer_set_sha256": "5070e93f744a2a1929dbfb7539d70d6115e753ede7258a95cfc5cb88c5808396",
+  "constants_commit_sha": "fe45cefe26f763e1305ce648e944e41aeb556b41",
+  "opted_out_count": 661,
+  "recovery_unit": "risk_item",
+  "total_contacts": 18004,
+  "total_recoveries": 4290,
+  "recovered_amount_paise": 1669490034,
+  "incentive_spend_paise": 24353495,
+  "recovered_amount_per_contact_paise": 92728.83992446124,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 4618,
+      "recoveries": 1060,
+      "recovered_amount_paise": 215441352,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 4516,
+      "recoveries": 1134,
+      "recovered_amount_paise": 348323065,
+      "incentive_spend_paise": 17415628
+    },
+    "mandate_recovery_agent": {
+      "contacts": 4433,
+      "recoveries": 1082,
+      "recovered_amount_paise": 346919989,
+      "incentive_spend_paise": 6937867
+    },
+    "receivables_agent": {
+      "contacts": 4437,
+      "recoveries": 1014,
+      "recovered_amount_paise": 758805628,
+      "incentive_spend_paise": 0
+    }
+  },
+  "natural": {
+    "natural_recovery_unit": "risk_item",
+    "natural_total_items": 1996,
+    "natural_total_recoveries": 89,
+    "natural_recovered_amount_paise": 25348148,
+    "natural_recovered_amount_per_item_paise": 12699.472945891783
+  },
+  "total_recovered_amount_paise": 1694838182
+}

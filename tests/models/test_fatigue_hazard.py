@@ -26,25 +26,44 @@ def _row(source="abandoned_checkout", root_cause="price_hesitation", contact_ind
     )
 
 
-def test_contact_outcome_carries_no_opt_out_field():
-    """Structural, not incidental: this is what makes the fatigue-hazard
-    model unavailable, checked against the live dataclass rather than
-    trusted from a comment."""
+def test_contact_outcome_now_carries_an_opt_out_field():
+    """Phase 6 asserted the ABSENCE of this field (that was the honest
+    finding at the time). Phase 7 (spec §8.9) deliberately adds it —
+    `agents.types.ContactOutcome.opt_out` / `.opt_out_channel`, defaulted
+    so every pre-Phase-7 caller is unaffected. This test is UPDATED, not
+    deleted, to record the transition explicitly (Phase 7 design lock,
+    Decision 13's principle, applied to a second Phase-6 structural test
+    this session found in the same position)."""
     field_names = {f.name for f in dataclasses.fields(ContactOutcome)}
-    assert not any("opt_out" in name or "optout" in name for name in field_names)
+    assert any("opt_out" in name or "optout" in name for name in field_names)
 
 
-def test_detect_opt_out_labels_reports_unavailable():
+def test_detect_opt_out_labels_reports_available_as_of_phase_7():
+    """UPDATED from Phase 6's `test_detect_opt_out_labels_reports_unavailable`
+    — the structural check is dataset-agnostic by design (its own
+    docstring), and the field genuinely exists now. Whether a SPECIFIC
+    dataset has any positive label is answered separately by
+    `train_fatigue_hazard_model`'s own data-volume check, exercised in
+    `test_train_fatigue_hazard_model_is_honestly_unavailable_on_world_v1_arm_a`
+    below."""
     report = detect_opt_out_labels()
-    assert report.has_opt_out_labels is False
-    assert "no opt-out-related field" in report.reason
+    assert report.has_opt_out_labels is True
+    assert "structurally available" in report.reason
 
 
-def test_train_fatigue_hazard_model_is_honestly_unavailable():
+def test_train_fatigue_hazard_model_is_honestly_unavailable_on_world_v1_arm_a():
+    """Phase 6's original entry point (no `fraction` argument) still
+    reports unavailable — Arm A always builds its Environment at
+    world="v1" (sim/arm_a.py is frozen), which never draws an opt-out
+    label, for any seed. The REASON text changed (now cites the real
+    zero-positive-labels finding instead of "no seed can ever pass"),
+    but the conclusion — and hence sampark/models/artifact_data.py's
+    FATIGUE_HAZARD_AVAILABLE=False — is unchanged."""
     result = train_fatigue_hazard_model(seed=42)
     assert result.available is False
     assert result.model is None
     assert result.reason is not None
+    assert "0 positive labels" in result.reason
 
 
 def test_fit_fatigue_hazard_model_recovers_a_known_synthetic_hazard():

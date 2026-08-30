@@ -1,0 +1,10 @@
+{
+  "arm": "H",
+  "seed": 31337,
+  "constants_commit_sha": "fe45cefe26f763e1305ce648e944e41aeb556b41",
+  "natural_recovery_unit": "risk_item",
+  "natural_total_items": 20000,
+  "natural_total_recoveries": 1080,
+  "natural_recovered_amount_paise": 331600271,
+  "natural_recovered_amount_per_item_paise": 16580.01355
+}

@@ -80,7 +80,7 @@ def test_model_backed_scorer_used_when_artifact_is_valid(monkeypatch):
         fatigue_hazard_available=True, fatigue_hazard_reason=None,
         fatigue_hazard_model=FatigueHazardModel(hazard_by_bucket={("abandoned_checkout", "price_hesitation", 0): 0.1}),
     )
-    monkeypatch.setattr("sampark.models.scorer.load_committed_artifact", lambda: valid_artifact)
+    monkeypatch.setattr("sampark.models.scorer.load_committed_artifact", lambda module_name: valid_artifact)
     scorer = build_scorer()
     assert isinstance(scorer, ModelBackedScorer)
     assert scorer.artifact is valid_artifact

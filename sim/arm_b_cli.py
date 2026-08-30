@@ -88,7 +88,13 @@ MERCHANT_MARGIN_HALF = "merchant_margin_half"
 FIFO_UNDER_CAP = "fifo_under_cap"
 PHASE6_HEURISTIC = "phase6_heuristic"
 PHASE6_MODEL = "phase6_model"
-ABLATIONS = (HEADLINE, AGING_ZERO, MERCHANT_MARGIN_HALF, FIFO_UNDER_CAP, PHASE6_HEURISTIC, PHASE6_MODEL)
+PHASE7_HEURISTIC = "phase7_heuristic"
+PHASE7_MODEL = "phase7_model"
+PHASE7_MODEL_UPLIFT = "phase7_model_uplift"
+ABLATIONS = (
+    HEADLINE, AGING_ZERO, MERCHANT_MARGIN_HALF, FIFO_UNDER_CAP, PHASE6_HEURISTIC, PHASE6_MODEL,
+    PHASE7_HEURISTIC, PHASE7_MODEL, PHASE7_MODEL_UPLIFT,
+)
 
 # W8: a short, self-contained note stamped into EVERY result file under
 # "ablation_note" — a reader of just the JSON (not this module's
@@ -117,6 +123,33 @@ _ABLATION_NOTES: dict[str, str] = {
         "back to HeuristicScorer and reproduces headline too. That is the honest Phase 6 "
         "result on this dataset, not a bug in the ablation."
     ),
+    PHASE7_HEURISTIC: (
+        "Phase 7's paired heuristic ablation, mirroring phase6_heuristic exactly: "
+        "explicitly constructed as HeuristicScorer, the same frozen formula as headline, "
+        "run through the SAME sim.arm_b.run_arm_b (no holdout -- this ablation tests the "
+        "SCORER seam only). Must reproduce headline exactly."
+    ),
+    PHASE7_MODEL: (
+        "sampark.models.scorer.build_scorer(module_name='sampark.models.artifact_data_phase7', "
+        "p_hat_mode='level') against the Phase 7 committed artifact (sim/train_phase7_models.py, "
+        "seed 42, holdout fraction 0.10). On this dataset uplift reports available=False "
+        "(most (source, root_cause) buckets fall below the 200-observation floor in the "
+        "holdout control arm) even though fatigue-hazard reports available=True -- the "
+        "all-or-nothing gate (both required) falls back to HeuristicScorer, reproducing "
+        "headline exactly. This is the honest Phase 7 result, not a bug in the ablation. "
+        "NOTE: this ablation runs the STANDARD (non-holdout) sim.arm_b.run_arm_b -- it "
+        "tests whether the COMMITTED MODEL (trained separately, on Arm A-H) changes "
+        "SCORING behavior when applied to headline candidates; it does not itself "
+        "introduce a holdout into this run."
+    ),
+    PHASE7_MODEL_UPLIFT: (
+        "Identical to phase7_model except p_hat_mode='uplift' (Phase 7 design lock, "
+        "Decision 5: p_hat = treated - control, the causally correct quantity, shipped "
+        "as a SEPARATE named ablation rather than silently changing phase7_model's "
+        "formula). On this dataset the uplift component is unavailable regardless of "
+        "p_hat_mode, so this ablation ALSO falls back to HeuristicScorer and reproduces "
+        "headline exactly, for the same reason as phase7_model."
+    ),
 }
 
 
@@ -140,6 +173,16 @@ def _ablation_params(ablation: str) -> dict:
         from sampark.models.scorer import build_scorer  # local: only Phase 6 ablations need sklearn
 
         return {"scorer": build_scorer()}
+    if ablation == PHASE7_HEURISTIC:
+        return {"scorer": HeuristicScorer()}
+    if ablation == PHASE7_MODEL:
+        from sampark.models.scorer import build_scorer  # local: only Phase 6/7 ablations need sklearn
+
+        return {"scorer": build_scorer(module_name="sampark.models.artifact_data_phase7", p_hat_mode="level")}
+    if ablation == PHASE7_MODEL_UPLIFT:
+        from sampark.models.scorer import build_scorer
+
+        return {"scorer": build_scorer(module_name="sampark.models.artifact_data_phase7", p_hat_mode="uplift")}
     raise ValueError(f"unknown ablation: {ablation!r}")  # unreachable — argparse choices= guards this
 
 

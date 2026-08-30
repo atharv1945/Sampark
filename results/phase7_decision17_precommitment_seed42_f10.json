@@ -1,0 +1,18 @@
+{
+  "seed": 42,
+  "fraction": 0.1,
+  "arm": "A-H",
+  "predicted_natural_recovered_paise": 30658277,
+  "n_uncontacted_items": 1962,
+  "natural_model_version": 1,
+  "multiplier_table": {
+    "issuer_downtime": 0.4,
+    "insufficient_funds": 0.35,
+    "authentication_drop": 0.25,
+    "unknown": 0.15,
+    "mandate_expired": 0.1,
+    "price_hesitation": 0.1,
+    "intent_lost": 0.05,
+    "disputed": 0.05
+  }
+}

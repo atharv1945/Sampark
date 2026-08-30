@@ -61,6 +61,11 @@ _ABLATION_TO_ARM_B_FILENAME = {
     # record and only teaches this gate how to read them back.
     "phase6_heuristic": "arm_b_phase6_heuristic_metrics_{seed}.json",
     "phase6_model": "arm_b_phase6_model_metrics_{seed}.json",
+    # Phase 7: same additive pattern — new filenames only, never touching
+    # the four Phase 4 entries above or the two Phase 6 entries.
+    "phase7_heuristic": "arm_b_phase7_heuristic_metrics_{seed}.json",
+    "phase7_model": "arm_b_phase7_model_metrics_{seed}.json",
+    "phase7_model_uplift": "arm_b_phase7_model_uplift_metrics_{seed}.json",
 }
 
 

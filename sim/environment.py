@@ -34,12 +34,48 @@ enforces this directly: `observe` raises DuplicateObservationError if
 the same risk_id is ever observed a second time, rather than silently
 drawing (and potentially counting) a second recovery for money that was
 already resolved.
+
+--- Phase 7: world v2 (spec §8.9) ---
+
+`Environment.build(..., world="v1")` is the default everywhere and is
+BYTE-IDENTICAL to pre-Phase-7 behavior: `p_recover` and `observe`'s core
+logic (this module's frozen lines) are untouched, and the two new RNG
+namespaces below are never constructed at all under world="v1" — the
+opt-out/natural-recovery code paths are gated off, not merely defaulted
+to zero.
+
+`world="v2"` adds two things, each independent of `self._rng`
+(`_RESPONSE_MODEL_SALT = 991`, unchanged):
+
+    1. An OPT-OUT draw inside `observe()` itself — spec §8.6's
+       `Δ P(opt_out | contact_history + this_contact)` finally
+       instantiated as a real, ContactOutcome-level label, drawn from
+       `_OPTOUT_MODEL_SALT`'s own Generator. It never reads or perturbs
+       `self._rng`, and it never changes `recovered` /
+       `amount_recovered_paise` / `incentive_paise` — only the two new
+       `ContactOutcome` fields (`agents/types.py`).
+    2. `observe_natural()` — a SEPARATE method, called by the runner only
+       for risk items that were NEVER contacted, strictly AFTER the
+       contact stream for a run is complete, over the complement of the
+       contacted set. It reads `_NATURAL_RECOVERY_SALT`'s own Generator
+       and shares the SAME `_observed_risk_ids` exactly-once guard
+       `observe()` already enforces, so a risk item can never receive
+       both a contacted outcome and a natural outcome. Because it runs
+       strictly after every admission/ranking/grant decision for the run
+       has already been made, it cannot influence any of them — this is
+       a property of WHEN it is called, not merely an intention.
+
+Both new RNG streams are independent `numpy.random.Generator` instances,
+seeded from `(seed, <their own salt>)`, exactly mirroring how
+`_RESPONSE_MODEL_SALT` is already isolated from `sim/seeding.py`'s
+`make_rngs` namespace.
 """
 
 from __future__ import annotations
 
 import math
 from collections import defaultdict
+from datetime import datetime
 from typing import Mapping, Protocol
 
 import numpy as np
@@ -48,6 +84,7 @@ from agents.types import ContactAction, ContactOutcome
 from sampark.contracts import RiskItem
 from sim.generator import RawSignal
 from sim.ledger import Ledger
+from sim.natural import NaturalOutcome, p_natural
 from sim.population import HiddenResponseProfile, Population
 
 BETA_INCENTIVE = 4.0
@@ -55,6 +92,27 @@ BETA_FATIGUE = 1.0
 
 _RESPONSE_MODEL_SALT = 991
 _PROBABILITY_EPSILON = 1e-9
+
+# --- Phase 7, world v2 only ------------------------------------------------
+
+VALID_WORLDS = ("v1", "v2")
+_NATURAL_RECOVERY_SALT = 7331
+_OPTOUT_MODEL_SALT = 1523
+
+# Owner-authored prior (Phase 7 design lock, Decision 10) — the same class
+# of decision as BETA_INCENTIVE/BETA_FATIGUE above: a simulation
+# coefficient, not calibrated against anything, chosen BEFORE any Phase 7
+# evidence run and never re-tuned after observing one (Decision 17's
+# precommitment discipline). Calibration target: a cumulative monthly
+# opt-out rate plausible for a recovery-messaging programme, and enough
+# positive labels to clear the fatigue-hazard model's MIN_POSITIVES_PER_BUCKET
+# floor (sampark/models/fatigue_hazard.py) at the (contact_index) level —
+# not the reverse. At the mean fatigue_hazard (Beta(2, 8), mean 0.2) and a
+# first contact (prior_contacts=0), this yields p_optout ~= 0.06 * 0.2 * 1
+# = 1.2%; at a high-fatigue customer's second contact (fatigue_hazard=0.8,
+# prior_contacts=1), p_optout ~= 0.06 * 0.8 * 2 = 9.6%.
+OPTOUT_BASE = 0.06
+OPTOUT_MAX = 0.5
 
 
 class DuplicateObservationError(RuntimeError):
@@ -95,6 +153,26 @@ def p_recover(profile: HiddenResponseProfile, incentive_bps: int, prior_contacts
     return _sigmoid(logit_p)
 
 
+def p_optout(profile: HiddenResponseProfile, prior_contacts: int) -> float:
+    """Pure ground-truth opt-out probability for the contact about to be
+    made — no RNG, no state. `prior_contacts` is the SAME value `observe()`
+    already computes for `p_recover` (contacts strictly before this one);
+    `(1 + prior_contacts)` is "contacts so far including this one", matching
+    spec §8.6's `Δ P(opt_out | contact_history + this_contact)`.
+
+    Locked properties (Phase 7 design lock §7.4), each directly testable:
+      - zero with no contact: this function is only ever called from
+        inside `observe()`, i.e. only for a risk item that IS being
+        contacted right now — it is never evaluated for an uncontacted
+        item, so "no contact -> p_optout=0" holds by construction, not by
+        a special-cased branch here.
+      - monotone non-decreasing in prior_contacts (fatigue accumulates).
+      - monotone non-decreasing in profile.fatigue_hazard (the existing
+        hidden parameter means what it is named).
+    """
+    return min(OPTOUT_MAX, OPTOUT_BASE * profile.fatigue_hazard * (1 + prior_contacts))
+
+
 def _profile_by_customer(
     population: Population, signals: tuple[RawSignal, ...], ledger: Ledger
 ) -> dict[str, HiddenResponseProfile]:
@@ -123,10 +201,23 @@ class Environment:
     """
 
     def __init__(
-        self, profile_by_customer: Mapping[str, HiddenResponseProfile], rng: _RandomSource
+        self,
+        profile_by_customer: Mapping[str, HiddenResponseProfile],
+        rng: _RandomSource,
+        *,
+        world: str = "v1",
+        natural_rng: "_RandomSource | None" = None,
+        optout_rng: "_RandomSource | None" = None,
     ) -> None:
+        if world not in VALID_WORLDS:
+            raise ValueError(f"world must be one of {VALID_WORLDS}, got {world!r}")
+        if world == "v2" and (natural_rng is None or optout_rng is None):
+            raise ValueError("world='v2' requires both natural_rng and optout_rng")
         self._profile_by_customer = profile_by_customer
         self._rng = rng
+        self._world = world
+        self._natural_rng = natural_rng
+        self._optout_rng = optout_rng
         self._true_contacts: dict[str, int] = defaultdict(int)
         self._observed_risk_ids: set[str] = set()
 
@@ -137,9 +228,29 @@ class Environment:
         signals: tuple[RawSignal, ...],
         ledger: Ledger,
         seed: int,
+        *,
+        world: str = "v1",
     ) -> "Environment":
+        """`world="v1"` (default; every pre-Phase-7 call site) constructs
+        ONLY the unchanged response-model RNG — `natural_rng`/`optout_rng`
+        stay `None` and the two new RNG namespaces below are never even
+        instantiated. `world="v2"` additionally constructs them, each from
+        its own `(seed, salt)` `SeedSequence`, independent of
+        `_RESPONSE_MODEL_SALT` and of `sim/seeding.py`'s `make_rngs`
+        namespace — the same isolation pattern this classmethod already
+        used for the response model before Phase 7."""
         rng = np.random.default_rng(np.random.SeedSequence(entropy=(seed, _RESPONSE_MODEL_SALT)))
-        return cls(_profile_by_customer(population, signals, ledger), rng)
+        natural_rng = optout_rng = None
+        if world == "v2":
+            natural_rng = np.random.default_rng(np.random.SeedSequence(entropy=(seed, _NATURAL_RECOVERY_SALT)))
+            optout_rng = np.random.default_rng(np.random.SeedSequence(entropy=(seed, _OPTOUT_MODEL_SALT)))
+        return cls(
+            _profile_by_customer(population, signals, ledger),
+            rng,
+            world=world,
+            natural_rng=natural_rng,
+            optout_rng=optout_rng,
+        )
 
     def observe(self, action: ContactAction, risk_item: RiskItem) -> ContactOutcome:
         if risk_item.risk_id in self._observed_risk_ids:
@@ -167,6 +278,21 @@ class Environment:
             (amount_recovered_paise * action.incentive_bps) // 10_000 if recovered else 0
         )
 
+        # Phase 7, world v2 only. self._rng (the line above) has already
+        # made its ONE draw for this call, exactly as before Phase 7 —
+        # this block reads a SEPARATE Generator and therefore cannot
+        # perturb that draw's value or the sequence of future draws from
+        # self._rng. Under world="v1" self._optout_rng is None and this
+        # block never executes.
+        opt_out = False
+        opt_out_channel: str | None = None
+        if self._world == "v2":
+            assert self._optout_rng is not None  # guaranteed by __init__'s world="v2" check
+            p_out = p_optout(profile, prior_contacts)
+            if bool(self._optout_rng.random() < p_out):
+                opt_out = True
+                opt_out_channel = action.channel
+
         return ContactOutcome(
             outcome_id=f"{action.agent_id}:{action.risk_id}",
             agent_id=action.agent_id,
@@ -178,4 +304,50 @@ class Environment:
             recovered=recovered,
             amount_recovered_paise=amount_recovered_paise,
             incentive_paise=incentive_paise,
+            opt_out=opt_out,
+            opt_out_channel=opt_out_channel,
+        )
+
+    def observe_natural(self, risk_item: RiskItem, customer_id: str, observed_at: datetime) -> NaturalOutcome:
+        """Resolves ONE risk item that was NEVER contacted, under world v2
+        only. Callers (the runner, never this class) must call this ONLY
+        after every admission/ranking/grant decision for the run is
+        already final, and ONLY for risk_ids in the complement of the
+        contacted set — this method enforces the SAME exactly-once guard
+        `observe()` uses (`_observed_risk_ids`), so a risk item that was
+        somehow passed to both raises `DuplicateObservationError` rather
+        than silently producing two outcomes for one item.
+
+        `observed_at` is supplied by the caller (never a wall clock —
+        Phase 7 design lock's determinism rule) — typically the run's
+        observation-window horizon end, since natural recovery has no
+        instantaneous decision moment the way a contact does.
+        """
+        if self._world != "v2":
+            raise RuntimeError("observe_natural requires world='v2'")
+        assert self._natural_rng is not None  # guaranteed by __init__'s world="v2" check
+
+        if risk_item.risk_id in self._observed_risk_ids:
+            raise DuplicateObservationError(
+                f"risk_id {risk_item.risk_id!r} was already observed — recovery_unit "
+                "is the RiskItem, and a risk item may be economically resolved at "
+                "most once (contacted XOR natural, never both)"
+            )
+        self._observed_risk_ids.add(risk_item.risk_id)
+
+        profile = self._profile_by_customer[customer_id]
+        probability = p_natural(profile, risk_item.root_cause)
+        recovered = bool(self._natural_rng.random() < probability)
+        amount_recovered_paise = risk_item.amount_paise if recovered else 0
+
+        return NaturalOutcome(
+            risk_id=risk_item.risk_id,
+            customer_id=customer_id,
+            source=risk_item.source,
+            root_cause=risk_item.root_cause,
+            amount_paise=risk_item.amount_paise,
+            p_natural=probability,
+            recovered=recovered,
+            amount_recovered_paise=amount_recovered_paise,
+            observed_at=observed_at,
         )

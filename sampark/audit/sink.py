@@ -38,13 +38,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import psycopg
 
 from sampark.allocator.outcomes import AllocationOutcome, OutcomeKind
 from sampark.audit import chain, emit
 from sampark.contracts import Agent, Grant, GrantDecision, GrantRequest
+
+if TYPE_CHECKING:
+    from sampark.attribution.credit import Credit
 
 
 class AuditSink(Protocol):
@@ -75,6 +78,19 @@ class AuditSink(Protocol):
     def record_grant_expired(self, grant_id: uuid.UUID, request_id: uuid.UUID, at: datetime) -> None: ...
 
     def record_agent_registered(self, agent: Agent, at: datetime) -> None: ...
+
+    # --- Phase 7 (spec §8.9) ---
+
+    def record_holdout_assigned(
+        self, seed: int, fraction_bps: int, assignment_version: int,
+        holdout_customer_count: int, holdout_customer_set_sha256: str, occurred_at: datetime,
+    ) -> None: ...
+
+    def record_contact_opt_out(
+        self, grant: Grant, request: GrantRequest, channel: str, contact_index: int, at: datetime
+    ) -> None: ...
+
+    def record_recovery_credited(self, credit: "Credit", request: GrantRequest, at: datetime) -> None: ...
 
 
 class MissingClaimError(RuntimeError):
@@ -132,6 +148,28 @@ class PostgresAuditSink:
 
     def record_agent_registered(self, agent: Agent, at: datetime) -> None:
         chain.append(self._conn, emit.event_for_agent_registered(agent, at))
+
+    # --- Phase 7 (spec §8.9) ---
+
+    def record_holdout_assigned(
+        self, seed: int, fraction_bps: int, assignment_version: int,
+        holdout_customer_count: int, holdout_customer_set_sha256: str, occurred_at: datetime,
+    ) -> None:
+        chain.append(
+            self._conn,
+            emit.event_for_holdout_assigned(
+                seed, fraction_bps, assignment_version, holdout_customer_count,
+                holdout_customer_set_sha256, occurred_at,
+            ),
+        )
+
+    def record_contact_opt_out(
+        self, grant: Grant, request: GrantRequest, channel: str, contact_index: int, at: datetime
+    ) -> None:
+        chain.append(self._conn, emit.event_for_contact_opt_out(grant, request, channel, contact_index, at))
+
+    def record_recovery_credited(self, credit: "Credit", request: GrantRequest, at: datetime) -> None:
+        chain.append(self._conn, emit.event_for_recovery_credited(credit, request, at))
 
     def _lookup_grant_metadata(self, grant_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
         with self._conn.cursor() as cur:

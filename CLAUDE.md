@@ -366,8 +366,59 @@ one and present it as settled.
 
 ## 15. Current phase
 
-**Phases 0–6 implemented. Phase 6 (Intelligence layer) is CLOSED as of this
-entry. Do not begin Phase 7 work until the owner reviews this closure.**
+**Phase status, as of the Phase 7 owner-closure session:**
+
+| Phase | Status |
+|---|---|
+| 0 — Foundations & Contracts | CLOSED |
+| 1 — Data Spine | CLOSED |
+| 2 — Arm A baseline | CLOSED |
+| 3 — Agent Registry | CLOSED |
+| 4 — Mediation core (hard gate) | CLOSED |
+| 5 — Audit chain / explainability | CLOSED |
+| 6 — Intelligence layer | CLOSED (evidence committed `510e5fa`) |
+| 7 — Attribution & policy compiler | **ENGINEERING CLOSED.** Evidence preserved at the documented seed-42 scope. Design decisions recorded in `DECISIONS.md`. See the three-way distinction below — this is not the same claim as "nothing remains." |
+| 8 — Demo surface | DEFERRED, not started |
+| 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | DEFERRED, not started |
+
+Phase 7 closure is genuinely three separate claims, kept distinct rather than
+collapsed into one "done":
+
+- **TECHNICAL** — Phase 7 is implemented and verified: every component
+  (holdout, world-v2 natural recovery, Arm A-H/Arm H/Arm B-H, attribution
+  baseline+ledger, uplift/fatigue-hazard holdout paths, policy compiler,
+  the three new audit event types wired into real operations) exists, is
+  tested, and its behavior has been checked against real PostgreSQL —
+  fresh in the owner-closure session, not merely asserted from an earlier
+  turn.
+- **EVIDENCE** — Phase 7 evidence is preserved at the documented,
+  explicitly scoped-down extent: single-seed (42) for the `phase7_*` Arm B
+  ablations (not the full 5×3 matrix — see the Phase 7 status block
+  below for why), no live LLM compile (no `ANTHROPIC_API_KEY`
+  configured), everything else at full precommitted scope (5 seeds ×
+  both holdout fractions for the model-availability findings).
+- **PROCEDURAL** — Phase 7 design decisions are recorded in
+  `DECISIONS.md`'s "Phase 7 — Attribution & policy compiler" entry, and
+  the Phase 6 evidence + Phase 7 implementation are committed (see below).
+  This closes the two items that were previously blocking Phase 8 for
+  procedural, not engineering, reasons.
+
+Phase 8 is ready to start on the next session's own terms — this session
+implements no Phase 8 code (see the Phase 8 readiness section in the
+closure report delivered to the user).
+
+**Correction to this section, made during the Phase 7 session that follows
+(re-verified directly against the repository, not assumed from this file):**
+open items 1, 2 and 4 below were already closed by owner action before this
+session started — U-1's DDL is present in `sampark/schema.sql` (`seq`,
+`UNIQUE(prev_hash)`, all three append-only triggers, confirmed by grep), CI's
+`postgres:16` service is present in `.github/workflows/ci.yml`, and
+`DECISIONS.md` carries Phase 0–6 entries. The line below stating "nothing
+from this phase is git-committed" is also stale: Phase 6 is commit `fe45cef`
+and the tree was clean at the start of the Phase 7 session. This section had
+not been updated to reflect those closures; it is corrected here rather than
+silently, per CLAUDE.md's own instruction to document inconsistencies found
+between a report and the actual repository state.
 
 Phases 0 through 5 have each demonstrated their spec §18.1 exit criterion
 (payment link + CI; 20k reproducible risk items; Arm A end-to-end metrics;
@@ -421,8 +472,10 @@ reason):**
   Phase 6). `python -m sampark.audit.verify` re-run after all Phase 6 evidence
   collection: `VALID: True`, 560 events, `genesis_ok: True`, `linkage_ok: True` — the
   audit chain was not disturbed by Phase 6 work.
-- Nothing from this phase is git-committed (§9); `git status` still shows the same
-  modified/untracked fileset the Phase 6 work produced.
+- Phase 6 is committed as `fe45cef`. `results/*.json` was gitignored at that
+  commit despite the exit criterion's "with the ablation committed" —
+  closed in the Phase 7 owner-closure session as commit `510e5fa` (item 3
+  below).
 
 **Phase 6 failure-recovery incident (for the owner's `DECISIONS.md`, not written here
 per §13):** mid-evidence-run, the host C: drive filled to 100% free space, which crashed
@@ -458,24 +511,11 @@ U-3 score threading, T-26 determinism) is implemented and independently
 verified against real PostgreSQL** — `python -m sampark.audit.verify`
 reports `VALID: True` against the live store.
 
-**Still open, pre-existing and independent of Phase 6 (carried forward, in order of
-what blocks the most — Phase 6 proceeded without these being closed; a Phase 7 session
-should still weigh them):**
+**Still open (re-verified at the start of the Phase 7 session; items 1, 2
+and 4 from the original list of five were already CLOSED by owner action
+and are removed from the open list below — see the correction note above):**
 
-1. `sampark/schema.sql` (human-owned — CLAUDE.md §3 item 1) does not yet
-   contain U-1's DDL (`seq`, `UNIQUE(prev_hash)`, the three append-only
-   triggers). U-1 has been owner-applied to the live database and
-   verified there; a *fresh checkout* cannot run Phase 5 until this file
-   is updated by the owner. `sampark/audit/schema_proposal.sql` holds the
-   exact DDL, unmodified, as the durable record of what was applied.
-2. CI has no PostgreSQL service (U-7, approved, not yet applied — owner
-   action per Design Lock §17.3, `.github/workflows/**` is human-owned).
-   Without it, 64 tests silently skip in CI, including
-   `tests/test_concurrent_grant_issuance.py` (§12's most important test)
-   and Phase 5's own T-18/T-26 exit-criterion tests. The exact proposed
-   diff is at `CI_POSTGRES_SERVICE_PROPOSAL.md` (repo root); the workflow
-   file itself has not been touched.
-3. U-8 (registry writes -> audit events, approved) is now wired for
+1. U-8 (registry writes -> audit events, approved) is now wired for
    `agent.registered` (`sim/arm_b.py`'s registry setup ->
    `sampark.audit.sink.AuditSink.record_agent_registered`, `audit_sink=None`
    by default, byte-identical when omitted). `agent.struck`/`agent.revoked`
@@ -487,13 +527,171 @@ should still weigh them):**
    in the codebase yet and is Phase 8 demo-surface territory, not a
    Phase 0–5 gap. Do not wire a scope-denial-triggered strike into
    `sampark/mediation/service.py` without an explicit owner decision —
-   the real spec-described trigger is a different mechanism.
-4. §18.1–§18.6 (Design Lock) and U-1…U-8 owner confirmations are not yet
-   recorded in `DECISIONS.md` — Claude must not write that file (§13);
-   the owner does.
-5. `results/*.json` (the entire Phase 4 evidence record) is gitignored —
-   durable only in this working tree. Whether to commit it conflicts with
-   the Phase 2 "generator committed, output not" convention; needs an
-   owner ruling before Phase 6 writes into the same directory.
+   the real spec-described trigger is a different mechanism. Also newly
+   surfaced during Phase 7 reconciliation: `CapabilityScope.max_requests_per_hour`
+   is declared, persisted, and enforced nowhere — the missing half of the
+   same §12.3 stage-two demo. Both belong to Phase 8, not Phase 7.
+2. **CLOSED in the Phase 7 owner-closure pass** (commit `510e5fa` for the
+   evidence, a `DECISIONS.md` edit for the decisions): §18.1–§18.6 (Design
+   Lock) and U-1…U-8 owner confirmations remain unresolved (no source
+   document exists to confirm them against — see item 4), but the Phase 7
+   design-lock decisions (holdout, natural recovery, Decision-17
+   precommitment, attribution, uplift/fatigue-hazard availability, policy
+   compiler, Phase 7 ablations, Phase 4 protection, regression, audit) are
+   now recorded in `DECISIONS.md`'s "Phase 7 — Attribution & policy
+   compiler" entry. Normally Claude must not write that file (§13, the
+   owner does) — this was an explicit, one-time exception: the owner's own
+   closure prompt stated "DECISIONS.md is now explicitly authorized to be
+   updated" and supplied the exact facts the entry must preserve.
+3. **CLOSED**: `results/*.json` is committed as `510e5fa`
+   ("evidence(phase6): commit frozen intelligence-layer results") — 43
+   result/gate files + the `.gitignore`/`.gitattributes` fix
+   (`results/*.json text eol=lf`, so `core.autocrlf=true` cannot make the
+   same evidence byte-different across platforms). `git ls-tree -r HEAD --
+   results/` confirms 43 tracked files. Nothing was regenerated for this
+   commit — the exact files the Phase 6 closure report was written
+   against.
+4. The "Design Lock" and "Phase 5A/5B" documents cited ~50 times across
+   this codebase as authoritative (`sampark/schema.sql`,
+   `sampark/allocator/*`, `sampark/policy/*`, `sampark/budget/*`,
+   `sampark/audit/*`, `sim/*`, `README.md`, `DECISIONS.md`) are not
+   present in the repository — only `PHASE4_SCHEMA_AND_ISSUANCE_PROPOSAL.md`
+   and `CI_POSTGRES_SERVICE_PROPOSAL.md` survive as derived records. A
+   reviewer cannot check any "Design Lock §N" claim against a source
+   document. Not a Phase 7 blocker; flagged because Phase 7 adds more such
+   citations to it.
+
+---
+
+**Phase 7 status (Attribution & policy compiler): IMPLEMENTED AND TESTED
+as of this entry.** Spec §18.1's stated exit criterion — "compiled rules
+pass their own generated tests before activating" — is demonstrated:
+`tests/policy/compiler/test_generate.py` exercises both a correctly
+compiled rule passing its generated test and a deliberately wrong one
+failing it. See the session's own final report for the authoritative
+implemented/tested/evidenced breakdown per component; this entry is a
+summary, not a duplicate.
+
+**What was built:** `sim/holdout.py` (deterministic customer-level
+assignment), `sim/environment.py` world v2 (opt-out labels + natural
+recovery, `world="v1"` default byte-identical to every pre-Phase-7
+caller), `sim/arm_a_holdout.py` / `sim/arm_h.py` / `sim/arm_b.py`'s
+`run_arm_b_holdout`, `sampark/models/{uplift,fatigue_hazard,artifact,scorer}.py`'s
+holdout-aware paths (never modifying the Phase 6 zero-arg entry points),
+`sampark/attribution/` (baseline/credit/store + schema PROPOSAL only —
+`sampark/schema.sql` untouched), three new audit event types
+(additive), and `sampark/policy/compiler/` + `sampark/policy/compiled/`
+(the full deterministic English→IR→rule pipeline).
+
+**Real evidence collected this session** (not merely "tests pass"):
+holdout balance SMD ≈ -0.0074 across 4,913 real customers; holdout-vs-
+Arm-H estimator validation (5.10% holdout estimate, 95% CI
+[4.21%, 6.16%], Arm H ground truth 5.29% — **inside the interval**);
+Decision-17 precommitted prediction (30,658,277 paise) vs realized
+(31,947,441 paise, 4.2% error); 18,038 real attribution credits with the
+arithmetic invariant holding for every one; fatigue-hazard model
+**available** (the first Phase 6/7 model to clear its gate) across all
+5 seeds × both fractions, hierarchical fallback proven to never return
+the old anti-conservative silent zero; uplift **honestly unavailable**
+across all 5 seeds × f∈{0.10,0.20,0.30,0.40} (structural — rare
+`unknown`-root-cause buckets never clear the floor even at f=0.40); a
+real ~108-minute Postgres-backed Arm B-H run (2 full simulated months,
+SERIALIZABLE issuance) proving the mechanism, opt-out enforcement,
+cleanup, and determinism, after which `python -m sampark.audit.verify`
+and `python -m sim.gate` both reproduced their pre-Phase-7 values
+exactly.
+
+**Explicitly scoped down, not silently skipped** (see the final report
+for the full list): the live English→IR LLM call was not exercised (no
+`ANTHROPIC_API_KEY` configured this session — `sampark/policy/compiler/llm.py`
+fails loudly rather than fabricating a response, CLAUDE.md §8);
+`sampark.policy.compiled.composed_hard_rules()`
+is not wired into `sampark/mediation/hard_filter.py` (a Phase-4-protected
+file) since `policies/activated.yaml` has no real (LLM-compiled) rule to
+exercise it with yet — `tests/policy/test_activation_empty_in_protected_evidence.py`
+proves the byte-identical-to-`HARD_RULES` safety property this future
+wiring will depend on; a full 5-seed × ablation Postgres-backed Arm B-H
+sweep was not completed (~1-2 hours per run measured directly — Arm B-H
+ran on the memory backend for all 5 seeds instead, with ONE real
+Postgres run as mechanism/determinism proof).
+
+**Phase 7 closure session (this entry, following the entries above —
+re-verified directly against the repository, not assumed from memory):**
+
+- `sim/arm_b_cli.py` **was** extended this session with three new
+  official-evidence ablations (`phase7_heuristic`, `phase7_model`,
+  `phase7_model_uplift`; also added to `sim/gate.py`'s filename map) —
+  correcting the "not extended" line above, which was accurate when
+  first written and is now stale. Each was run once against real
+  PostgreSQL at seed 42 (the precommitted headline seed) and reproduces
+  the frozen Phase 4 headline **exactly** (10299 contacts, 2691
+  recoveries, 1,593,664,601 paise recovered, 154,739.74 paise/contact,
+  18,363,386 paise incentive spend — bit-identical across `phase7_heuristic`,
+  `phase7_model`, `phase7_model_uplift`, and the original frozen
+  `arm_b_metrics_42.json`), each for a distinct honest reason
+  (`phase7_heuristic`: same `HeuristicScorer` explicitly constructed;
+  `phase7_model`/`phase7_model_uplift`: the committed Phase 7 model
+  artifact's all-or-nothing availability gate falls back to
+  `HeuristicScorer` because uplift is structurally unavailable on this
+  dataset, same reasoning as `phase6_model`). **Scoped down deliberately**:
+  the full 5-seed × 3-ablation matrix (15 runs) was not executed — one
+  real run measured at 48 minutes wall-clock makes the full matrix
+  ~12 hours, disproportionate given this regression-seam guarantee is a
+  code-path property (identical scorer/fallback logic) that does not
+  vary by seed, and given disk headroom was tight throughout this
+  session (see below). This is a scope decision, not a gap silently
+  left open.
+- Added `tests/audit/test_world_v2_does_not_affect_audit_generation.py`
+  (3 tests) proving world v2 cannot perturb audit-event generation or
+  `prev_hash`: structurally, none of the 11 pre-Phase-7
+  `sampark.audit.emit.event_for_*` functions accept a `world` parameter
+  or reference any world-v2-only type; combined with the existing
+  bit-identical-outcome tests (`tests/sim_environment/test_world_v2.py`,
+  `tests/sim_arm_b_holdout/test_arm_b_holdout_memory.py`) this is a
+  complete, direct proof, obtained without a duplicate Postgres run.
+- **Final full regression, run fresh after every change in this
+  session** (`python -m pytest -q`): **779 passed, 3 skipped** (skips
+  are the pre-existing, unrelated `tests/budget/test_precheck.py` redis
+  skips), exit 0, 7492s (2:04:52) wall-clock.
+  `python -m pytest tests/test_concurrent_grant_issuance.py -v`: both
+  tests pass standalone (the 50-way race and its negative control).
+- `python -m sampark.audit.verify` after all of the above: `VALID: True`,
+  560 events, `genesis_ok: True`, `linkage_ok: True` — unchanged from
+  every earlier check this session; none of this session's Arm B CLI
+  runs or the full test suite wrote to the real `public.audit_events`
+  (Postgres tests use isolated schemas; `arm_b_cli.py` runs with no
+  `audit_sink`).
+- Phase 4 headline (`results/gate_headline.json`,
+  `constants_commit_sha aa87123aafdc9d812f5a01c04766c60b9198a2ce`)
+  re-confirmed unchanged: mean A 89387.38057, mean B 156957.36981923878
+  paise/contact, uplift ratio range [1.7114, 1.8822], `gate_passed: true`.
+- Final Postgres residue check: `grant_requests`, `grants`,
+  `contact_slot_claims`, `customer_margin_windows`, `budget_windows` all
+  at 0 rows; `agents`/`capability_scopes` at 4 rows each (the standard
+  Arm-B-evidence-runner registrations — the same documented-safe residue
+  pattern as the Phase 6 closure, left in place since no cleanup routine
+  targets it and nothing depends on it being absent); no orphan schemas.
+- **Live risk, not yet an incident**: host C: drive free space dropped
+  from 6.2GB to 5.7GB (99% full) over this session's evidence collection
+  — the same low-disk condition that crashed Docker Desktop during the
+  Phase 6 session. Docker/Postgres remained healthy throughout this
+  session, but the margin is thin; freeing disk space before further
+  large evidence runs is advisable.
+- **Self-inflicted, low-severity, corrected same session**: while
+  reconnecting to Postgres for a residue check, an early `grep`
+  intended to redact `DATABASE_URL`-style connection strings did not
+  match the separate `POSTGRES_PASSWORD=...` line, and that local
+  test-database password (never a production credential, `.env` is
+  gitignored, nothing was committed) was echoed once to tool output.
+  Corrected immediately by reconnecting via named environment variables
+  without printing them. Recorded here per CLAUDE.md §8/§14's
+  transparency requirement, not because the credential itself was
+  sensitive.
+
+Phase 7 is implemented, tested, and evidenced as of this entry, with the
+scope reductions listed above stated explicitly rather than hidden. See
+the closure session's own final report (delivered to the user, not
+duplicated here) for the complete implemented/tested/evidenced
+breakdown and the prepared `DECISIONS.md` entry text.
 
 Update this section at each phase boundary.

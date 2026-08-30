@@ -45,6 +45,14 @@ class ContactOutcome:
     output field states this explicitly. That correction belongs to
     Phase 7 attribution (spec §8.9) and is deliberately not implemented
     yet.
+
+    `opt_out` / `opt_out_channel` (Phase 7, world v2 only): defaults
+    preserve every pre-Phase-7 caller's behavior byte-for-byte. Drawn in
+    `sim/environment.py::Environment.observe` from an RNG namespace
+    (`_OPTOUT_MODEL_SALT`) independent of the recovery draw — never
+    perturbs `recovered`/`amount_recovered_paise`/`incentive_paise`. Under
+    world="v1" (the default everywhere), no draw happens at all and these
+    two fields are always `(False, None)`.
     """
 
     outcome_id: str
@@ -57,6 +65,8 @@ class ContactOutcome:
     recovered: bool
     amount_recovered_paise: int
     incentive_paise: int
+    opt_out: bool = False
+    opt_out_channel: str | None = None
 
 
 @dataclass(frozen=True)

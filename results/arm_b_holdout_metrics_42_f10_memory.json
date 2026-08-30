@@ -1,0 +1,52 @@
+{
+  "arm": "B-H",
+  "seed": 42,
+  "fraction": 0.1,
+  "backend": "memory",
+  "backend_note": "Memory backend: proves the mechanism (holdout filtering, natural recovery for every uncontacted item, opt-out labels) and its determinism. Opt-out ENFORCEMENT (cross-window denial) is Postgres-only (InMemoryMediationLedger.optouts_by_channel is a frozen {} stub) -- validated separately, for seed 42 at this same fraction, in tests/sim_arm_b_holdout/test_arm_b_holdout_postgres.py (real SERIALIZABLE issuance, 1:48:01 for two full runs, all 4 assertions passed).",
+  "assignment_version": 1,
+  "holdout_customer_count": 490,
+  "holdout_customer_set_sha256": "f0269581cdfd3749736d743318e69083ed9d862f633627bf5ec8647b0c046770",
+  "constants_commit_sha": "fe45cefe26f763e1305ce648e944e41aeb556b41",
+  "opted_out_count": 195,
+  "recovery_unit": "risk_item",
+  "total_contacts": 9267,
+  "total_recoveries": 2415,
+  "recovered_amount_paise": 1384918633,
+  "incentive_spend_paise": 16805011,
+  "recovered_amount_per_contact_paise": 149446.2752778677,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 1543,
+      "recoveries": 401,
+      "recovered_amount_paise": 151972030,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 1599,
+      "recoveries": 438,
+      "recovered_amount_paise": 236630579,
+      "incentive_spend_paise": 11831326
+    },
+    "mandate_recovery_agent": {
+      "contacts": 2395,
+      "recoveries": 634,
+      "recovered_amount_paise": 248699906,
+      "incentive_spend_paise": 4973685
+    },
+    "receivables_agent": {
+      "contacts": 3730,
+      "recoveries": 942,
+      "recovered_amount_paise": 747616118,
+      "incentive_spend_paise": 0
+    }
+  },
+  "natural": {
+    "natural_recovery_unit": "risk_item",
+    "natural_total_items": 10733,
+    "natural_total_recoveries": 584,
+    "natural_recovered_amount_paise": 101893447,
+    "natural_recovered_amount_per_item_paise": 9493.473120283239
+  },
+  "total_recovered_amount_paise": 1486812080
+}

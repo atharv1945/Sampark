@@ -55,6 +55,7 @@ GrantRequest/Grant/budget state is persisted and re-read differs.
 
 from __future__ import annotations
 
+import collections
 import hashlib
 import uuid
 from dataclasses import dataclass
@@ -314,6 +315,7 @@ def _run_window_loop(
     audit_sink: "AuditSink | None" = None,
     scorer: "Scorer | None" = None,
     outcome_observer=None,
+    optout_writeback=None,
 ) -> tuple[tuple[ContactOutcome, ...], tuple[GrantDecision, ...]]:
     """The mediation algorithm itself — IDENTICAL for both backends. Every
     parameter here is already backend-specific data (a repository, a
@@ -332,7 +334,20 @@ def _run_window_loop(
     grant.executing / grant.confirmed, both needing only `grant` +
     `request`, neither needing an AllocationOutcome — are recorded right
     alongside the EXISTING `lifecycle_adapter.execute`/`.confirm` calls
-    below, in the same order, with no new control flow."""
+    below, in the same order, with no new control flow.
+
+    `optout_writeback` (Phase 7, world v2 only) — an optional
+    `Callable[[str, str, datetime], None]` called with
+    `(customer_id, channel, at)` exactly once per CONFIRMED outcome whose
+    `opt_out` is True. `None` by default (every pre-Phase-7 call site):
+    the branch that reads it is skipped entirely, so this is a no-op for
+    every existing caller. The one Phase 7 caller
+    (`run_arm_b_holdout`, postgres backend only) passes
+    `sim.optout_writeback.write_optout`, which persists the opt-out into
+    `contact_states.optouts_by_channel` so `sampark/policy/hard/opt_out.py`
+    denies this customer's channel in a LATER window — this function
+    itself makes no policy decision, only records a fact the environment
+    already produced."""
     if not all_actions:
         return (), ()
 
@@ -349,6 +364,12 @@ def _run_window_loop(
     carried_forward: tuple[Candidate, ...] = ()
     all_decisions: list[GrantDecision] = []
     outcomes: list[ContactOutcome] = []
+    # Phase 7: cross-agent contact index per customer, tracked ONLY for
+    # the contact.opt_out audit event's payload (informational — never
+    # read by any decision). Mirrors Environment's own prior_contacts
+    # bookkeeping; a SEPARATE counter, since Environment does not expose
+    # its internal one.
+    _contact_counts: dict[str, int] = collections.defaultdict(int)
 
     window = first_window
     while window <= last_window:
@@ -394,6 +415,14 @@ def _run_window_loop(
             lifecycle_adapter.confirm(grant.grant_id, at=grant.send_after, actual_spend_paise=outcome.incentive_paise)
             if audit_sink is not None:
                 audit_sink.record_grant_confirmed(grant, request, grant.send_after, outcome.incentive_paise)
+            contact_index = _contact_counts[request.customer_id]
+            _contact_counts[request.customer_id] += 1
+            if outcome.opt_out:
+                assert outcome.opt_out_channel is not None
+                if optout_writeback is not None:
+                    optout_writeback(outcome.customer_id, outcome.opt_out_channel, grant.send_after)
+                if audit_sink is not None:
+                    audit_sink.record_contact_opt_out(grant, request, outcome.opt_out_channel, contact_index, grant.send_after)
             outcomes.append(outcome)
 
         carried_forward = result.rescheduled_candidates
@@ -598,4 +627,273 @@ def run_arm_b(
         seed, ledger, view, environment, all_actions, aging_bonus_paise, fifo_mode, merchant_budget_paise_per_window,
         audit_sink=audit_sink,
         scorer=scorer, outcome_observer=outcome_observer,
+    )
+
+
+# =============================================================================
+# Phase 7 — Arm B-H (mediated, minus a randomized customer-level holdout,
+# world v2). Additive: run_arm_b / _run_arm_b_memory / _run_arm_b_postgres /
+# _run_window_loop's Phase-4/6 behavior is UNCHANGED (verified by the Phase
+# 4 gate re-run and the placebo tests) — everything below is new code that
+# no pre-Phase-7 caller reaches.
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ArmBHoldoutResult:
+    contact_outcomes: tuple[ContactOutcome, ...]
+    natural_outcomes: "tuple"
+    decisions: tuple[GrantDecision, ...]
+    backend: str
+    holdout_customer_ids: frozenset[str]
+    holdout_customer_set_sha256: str
+    seed: int
+    fraction: float
+
+
+def _cleanup_postgres_holdout_run(
+    conn: psycopg.Connection, customer_ids: list[str], window_range: tuple[date, date]
+) -> None:
+    """Extends `_cleanup_postgres_run` (unmodified, called first) with the
+    ONE additional piece of mutable state Arm B-H introduces:
+    `contact_states.optouts_by_channel`, written by `sim.optout_writeback`
+    during the run. Without this, a later run over overlapping customer_ids
+    (e.g. a rerun of the same seed) would see stale opt-out state from a
+    completed evidence run and get spurious `opt_out.py` denials — the same
+    class of bug `_cleanup_postgres_run`'s own docstring already explains
+    for `contacts_24h`/`contacts_7d`/`last_contact_at`. Never touches
+    `consent_scopes` or `fatigue_score` — those remain reusable ledger data,
+    matching `_cleanup_postgres_run`'s own documented scope exactly."""
+    _cleanup_postgres_run(conn, customer_ids, window_range)
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE contact_states SET optouts_by_channel = '{}'::jsonb WHERE customer_id = ANY(%s)",
+            (customer_ids,),
+        )
+
+
+def _natural_outcomes_for_uncontacted(
+    environment: Environment,
+    ledger: Ledger,
+    contacted_risk_ids: frozenset[str],
+) -> tuple:
+    """Phase 7 design lock, Decision 1 (Option 2): EVERY uncontacted risk
+    item receives a natural-recovery draw, in every arm — not only
+    held-out customers' items but also allocator-declined /
+    deferred-to-terminal-deny items for non-held-out customers. Called
+    strictly AFTER `_run_window_loop` has returned (i.e. after every
+    admission/ranking/grant decision for the entire run is already final),
+    so it cannot influence any of them.
+
+    Distinguishing "randomized holdout" from "allocator-declined" among
+    these uncontacted items is NOT this function's job — both receive an
+    identical draw here. The distinction matters only for attribution
+    baseline ESTIMATION (Phase 7 design lock, Decision 15's hard
+    restriction), enforced in `sampark/attribution/baseline.py`, which
+    reads ONLY the subset whose customer_id is in the holdout set."""
+    from sim.natural import observation_window_end
+
+    horizon = observation_window_end()
+    risk_items_by_id = {item.risk_id: item for item in ledger.risk_items}
+    uncontacted = sorted(set(risk_items_by_id) - contacted_risk_ids)
+    return tuple(
+        environment.observe_natural(
+            risk_items_by_id[risk_id], ledger.risk_customer_map[risk_id], observed_at=horizon
+        )
+        for risk_id in uncontacted
+    )
+
+
+def _emit_holdout_assigned(
+    audit_sink: "AuditSink | None", seed: int, fraction: float, held_out: frozenset[str],
+    digest: str, occurred_at: datetime,
+) -> None:
+    if audit_sink is None:
+        return
+    audit_sink.record_holdout_assigned(
+        seed=seed, fraction_bps=round(fraction * 10_000), assignment_version=1,
+        holdout_customer_count=len(held_out), holdout_customer_set_sha256=digest, occurred_at=occurred_at,
+    )
+
+
+def _run_arm_b_holdout_memory(
+    seed: int, fraction: float, ledger: Ledger, environment: Environment,
+    all_actions: list[ContactAction], held_out: frozenset[str],
+    aging_bonus_paise: int, fifo_mode: bool,
+    merchant_budget_paise_per_window: int,
+    scorer: "Scorer | None" = None,
+    audit_sink: "AuditSink | None" = None,
+) -> ArmBHoldoutResult:
+    filtered_actions = [a for a in all_actions if a.customer_id not in held_out]
+
+    registered_at = window_start_for(_window_range(all_actions)[0]) if audit_sink is not None and all_actions else None
+    agent_repo, keypairs = _build_agent_registry_memory(seed, audit_sink=audit_sink, registered_at=registered_at)
+    risk_item_repo = _build_risk_item_repo(ledger)
+    mediation_ledger = InMemoryMediationLedger(
+        _risk_items_by_customer(ledger), merchant_budget_paise_per_window=merchant_budget_paise_per_window
+    )
+    issuer = InMemoryGrantIssuer()
+    risk_items_by_id = {item.risk_id: item for item in ledger.risk_items}
+    run_seed_risk_ids = frozenset(item.risk_id for item in ledger.risk_items)
+
+    from sim.holdout import membership_digest
+
+    digest = membership_digest(held_out)
+    if audit_sink is not None and all_actions:
+        _emit_holdout_assigned(audit_sink, seed, fraction, held_out, digest, registered_at)
+
+    # optout_writeback is intentionally NOT passed here: InMemoryMediationLedger
+    # .optouts_by_channel is a hardcoded {} stub (sampark/budget/store.py,
+    # frozen) with no mutable state to write into. Opt-out LABELS are still
+    # drawn (ContactOutcome.opt_out), and contact.opt_out audit events are
+    # still emitted if audit_sink is given — only cross-window ENFORCEMENT
+    # is unavailable on this backend. See sim/optout_writeback.py's docstring.
+    outcomes, decisions = _run_window_loop(
+        seed, filtered_actions, keypairs, agent_repo, risk_item_repo, mediation_ledger, issuer, environment,
+        risk_items_by_id, aging_bonus_paise, fifo_mode,
+        lifecycle_adapter=_MemoryLifecycleAdapter(mediation_ledger), conn_for_issuance=None,
+        run_seed_risk_ids=run_seed_risk_ids, scorer=scorer, audit_sink=audit_sink,
+    )
+
+    natural_outcomes = _natural_outcomes_for_uncontacted(
+        environment, ledger, contacted_risk_ids=frozenset(o.risk_id for o in outcomes)
+    )
+
+    return ArmBHoldoutResult(
+        contact_outcomes=outcomes, natural_outcomes=natural_outcomes, decisions=decisions,
+        backend=BACKEND_MEMORY, holdout_customer_ids=held_out,
+        holdout_customer_set_sha256=digest, seed=seed, fraction=fraction,
+    )
+
+
+def _run_arm_b_holdout_postgres(
+    seed: int, fraction: float, ledger: Ledger, environment: Environment,
+    all_actions: list[ContactAction], held_out: frozenset[str],
+    aging_bonus_paise: int, fifo_mode: bool,
+    merchant_budget_paise_per_window: int,
+    scorer: "Scorer | None" = None,
+    audit_sink: "AuditSink | None" = None,
+) -> ArmBHoldoutResult:
+    from sim.holdout import membership_digest
+    from sim.optout_writeback import write_optout
+
+    filtered_actions = [a for a in all_actions if a.customer_id not in held_out]
+
+    config = PostgresConfig.from_env()
+    conn = psycopg.connect(config.conninfo())
+    conn.autocommit = True
+
+    customer_ids = sorted(set(ledger.risk_customer_map.values()))
+    window_range = _window_range(filtered_actions) if filtered_actions else _window_range(all_actions)
+
+    try:
+        load_ledger(conn, ledger)
+
+        registered_at = window_start_for(window_range[0]) if audit_sink is not None else None
+        keypairs = _build_agent_registry_postgres(conn, seed, audit_sink=audit_sink, registered_at=registered_at)
+        risk_item_repo = PostgresRiskItemRepository(conn)
+        agent_repo = PostgresAgentRepository(conn)
+        run_seed_risk_ids = frozenset(item.risk_id for item in ledger.risk_items)
+        mediation_ledger = PostgresMediationLedger(
+            conn, MERCHANT_ID, run_seed_risk_ids, merchant_budget_paise_per_window
+        )
+        issuer = PostgresGrantIssuer()
+        risk_items_by_id = {item.risk_id: item for item in ledger.risk_items}
+
+        first_window, last_window = window_range
+        w = first_window
+        while w <= last_window:
+            seed_budget_window(conn, MERCHANT_ID, w, merchant_budget_paise_per_window)
+            w += timedelta(days=1)
+
+        digest = membership_digest(held_out)
+        if audit_sink is not None:
+            _emit_holdout_assigned(audit_sink, seed, fraction, held_out, digest, registered_at)
+
+        def _optout_writeback(customer_id: str, channel: str, at: datetime) -> None:
+            write_optout(conn, customer_id, channel, at)
+
+        outcomes, decisions = _run_window_loop(
+            seed, filtered_actions, keypairs, agent_repo, risk_item_repo, mediation_ledger, issuer, environment,
+            risk_items_by_id, aging_bonus_paise, fifo_mode,
+            lifecycle_adapter=_PostgresLifecycleAdapter(conn), conn_for_issuance=conn,
+            run_seed_risk_ids=run_seed_risk_ids, scorer=scorer, audit_sink=audit_sink,
+            optout_writeback=_optout_writeback,
+        )
+
+        natural_outcomes = _natural_outcomes_for_uncontacted(
+            environment, ledger, contacted_risk_ids=frozenset(o.risk_id for o in outcomes)
+        )
+
+        return ArmBHoldoutResult(
+            contact_outcomes=outcomes, natural_outcomes=natural_outcomes, decisions=decisions,
+            backend=BACKEND_POSTGRES, holdout_customer_ids=held_out,
+            holdout_customer_set_sha256=digest, seed=seed, fraction=fraction,
+        )
+    finally:
+        _cleanup_postgres_holdout_run(conn, customer_ids, window_range)
+        conn.close()
+
+
+def run_arm_b_holdout(
+    seed: int,
+    fraction: float,
+    backend: str = BACKEND_MEMORY,
+    aging_bonus_paise: int = AGING_BONUS_PAISE,
+    merchant_budget_paise_per_window: int = MERCHANT_MARGIN_BUDGET_PAISE_PER_WINDOW,
+    fifo_mode: bool = False,
+    scorer: "Scorer | None" = None,
+    audit_sink: "AuditSink | None" = None,
+) -> ArmBHoldoutResult:
+    """Arm B-H — Phase 7 (spec §8.9, §11). `fraction=0.0` holds out nobody
+    (the world="v2"-with-empty-holdout diagnostic path, NOT the world="v1"
+    placebo — see sim/arm_a_holdout.py's docstring for the same
+    distinction). `merchant_budget_paise_per_window` is the FROZEN Phase 4
+    constant by default and is deliberately NEVER scaled by `(1 - fraction)`
+    here (Phase 7 design lock, Decision 3): scaling would introduce a
+    second simultaneous difference from Phase 4, making any observed
+    change uninterpretable. Run at two fractions (0.10, 0.20) to MEASURE
+    the interference this creates instead.
+
+    `audit_sink` (Phase 7) — `None` by default; every branch reading it
+    is skipped, matching `run_arm_b`'s own established convention. When
+    given, emits `holdout.assigned` ONCE per run (a digest event, never
+    one per customer) and `contact.opt_out` for each CONFIRMED contact
+    whose `outcome.opt_out` is True — both threaded through the SAME
+    `_run_window_loop` Phase 5 already uses for `grant.reserved`/
+    `grant.executing`/`grant.confirmed`. `recovery.credited` is NOT
+    emitted here: computing a credit requires the full holdout-derived
+    baseline estimate, only available AFTER this function returns (see
+    `sampark.attribution`). It IS wired — into the operation that
+    actually creates the credit, `sampark.attribution.store.insert_credit(conn,
+    credit, request=..., audit_sink=...)`, called by whoever computes
+    credits from this function's `natural_outcomes` (proven end-to-end
+    against real PostgreSQL in
+    tests/sampark_attribution/test_attribution_audit_integration.py)."""
+    if backend not in _VALID_BACKENDS:
+        raise ValueError(f"backend must be one of {_VALID_BACKENDS}, got {backend!r}")
+
+    from sim.holdout import assign, customer_amounts_from_risk_items
+
+    population, signals, ledger = build_dataset(seed)
+    view = _build_ledger_view(ledger)
+    environment = Environment.build(population, signals, ledger, seed, world="v2")
+
+    customer_amounts = customer_amounts_from_risk_items(ledger.risk_items, ledger.risk_customer_map)
+    held_out = assign(seed, fraction, customer_amounts)
+
+    all_actions: list[ContactAction] = []
+    for agent in _AGENTS:
+        all_actions.extend(agent.select_actions(view))
+
+    if backend == BACKEND_MEMORY:
+        return _run_arm_b_holdout_memory(
+            seed, fraction, ledger, environment, all_actions, held_out,
+            aging_bonus_paise, fifo_mode, merchant_budget_paise_per_window, scorer=scorer,
+            audit_sink=audit_sink,
+        )
+    return _run_arm_b_holdout_postgres(
+        seed, fraction, ledger, environment, all_actions, held_out,
+        aging_bonus_paise, fifo_mode, merchant_budget_paise_per_window, scorer=scorer,
+        audit_sink=audit_sink,
     )

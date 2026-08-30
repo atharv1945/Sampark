@@ -33,7 +33,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sampark.attribution.credit import Credit
 
 from sampark.allocator.outcomes import AllocationOutcome, OutcomeKind
 from sampark.audit.canonical import iso_utc_micros
@@ -42,6 +45,7 @@ from sampark.audit.event_types import (
     AGENT_REGISTERED,
     AGENT_REVOKED,
     AGENT_STRUCK,
+    CONTACT_OPT_OUT,
     DECISION_DEFERRED,
     DECISION_DENIED,
     GRANT_CONFIRMED,
@@ -49,6 +53,8 @@ from sampark.audit.event_types import (
     GRANT_EXPIRED,
     GRANT_RESERVED,
     GRANT_ROLLED_BACK,
+    HOLDOUT_ASSIGNED,
+    RECOVERY_CREDITED,
     REQUEST_DENIED_ON_SCOPE,
     REQUEST_RECEIVED,
 )
@@ -343,4 +349,91 @@ def event_for_agent_revoked(agent_after_revocation: Agent, at: datetime, reason_
         AGENT_REVOKED, event_id_for(AGENT_REVOKED, agent_after_revocation.agent_id), at,
         None, reason_code,
         {"agent_id": agent_after_revocation.agent_id, "strike_count": agent_after_revocation.strike_count},
+    )
+
+
+# --- Phase 7 (spec §8.9) ---------------------------------------------------
+
+
+def event_for_holdout_assigned(
+    seed: int,
+    fraction_bps: int,
+    assignment_version: int,
+    holdout_customer_count: int,
+    holdout_customer_set_sha256: str,
+    occurred_at: datetime,
+) -> AuditEvent:
+    """ONE digest event per run, not one per held-out customer (Phase 7
+    design lock, Decision 7): the full membership is reproducible from
+    `sim.holdout.assign(seed, fraction, ...)` alone, so the digest is
+    equally tamper-evident (any change to membership changes the SHA-256)
+    while keeping the chain O(1). Unsigned — no agent behind an
+    assignment decision, matching `event_for_agent_registered`'s own
+    unsigned precedent."""
+    return _draft(
+        HOLDOUT_ASSIGNED,
+        event_id_for(HOLDOUT_ASSIGNED, str(seed), str(fraction_bps), str(assignment_version)),
+        occurred_at, None, None,
+        {
+            "seed": seed,
+            "holdout_fraction_bps": fraction_bps,
+            "assignment_version": assignment_version,
+            "holdout_customer_count": holdout_customer_count,
+            "holdout_customer_set_sha256": holdout_customer_set_sha256,
+            "stratification": "amount_quintile_rank",
+        },
+    )
+
+
+def event_for_contact_opt_out(
+    grant: Grant, request: GrantRequest, channel: str, contact_index: int, at: datetime
+) -> AuditEvent:
+    """One per CONFIRMED contact whose `ContactOutcome.opt_out` is True
+    (world v2 only — Phase 7). Signed with the originating request's
+    signature, the same non-repudiable artifact `event_for_grant_confirmed`
+    already carries — no new cryptography (spec §8.1's promise)."""
+    return _draft(
+        CONTACT_OPT_OUT, event_id_for(CONTACT_OPT_OUT, str(grant.grant_id)), at,
+        request.signature, "optout.customer_initiated",
+        {
+            "customer_id": request.customer_id,
+            "channel": channel,
+            "grant_id": str(grant.grant_id),
+            "request_id": str(request.request_id),
+            "agent_id": request.agent_id,
+            "risk_id": request.risk_id,
+            "contact_index": contact_index,
+        },
+    )
+
+
+def event_for_recovery_credited(
+    credit: "Credit",  # sampark.attribution.credit.Credit (TYPE_CHECKING-only import — a data shape, not an evaluator; see module docstring)
+    request: GrantRequest,
+    at: datetime,
+) -> AuditEvent:
+    """One per `attribution_credits` row (spec §8.9's "signed against
+    that agent's identity" — the originating request's signature, same
+    precedent as every other grant-lifecycle event). `credit` is COPIED
+    from, never recomputed: this module has no attribution arithmetic of
+    its own, exactly as it has no scoring or policy arithmetic of its
+    own."""
+    return _draft(
+        RECOVERY_CREDITED, event_id_for(RECOVERY_CREDITED, str(credit.grant_id)), at,
+        request.signature, "attribution.credited",
+        {
+            "credit_id": str(credit.credit_id),
+            "grant_id": str(credit.grant_id),
+            "request_id": str(request.request_id),
+            "agent_id": request.agent_id,
+            "customer_id": request.customer_id,
+            "risk_id": request.risk_id,
+            "observed_recovered_paise": credit.observed_recovered_paise,
+            "natural_rate_bps": credit.natural_rate_bps,
+            "expected_natural_paise": credit.expected_natural_paise,
+            "credited_recovery_paise": credit.credited_recovery_paise,
+            "baseline_stratum": credit.baseline_stratum,
+            "baseline_level": credit.baseline_level,
+            "holdout_fraction_bps": credit.holdout_fraction_bps,
+        },
     )

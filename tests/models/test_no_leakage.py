@@ -86,9 +86,13 @@ def test_models_package_has_no_wall_clock_or_random_calls():
 
 
 def test_training_data_reads_only_seed_scoped_public_functions():
-    """sampark.models.training_data may call sim.arm_a.run_arm_a and
-    sim.cli.build_dataset (both already the calibration precedent's own
-    sources) and nothing else from sim/."""
+    """sampark.models.training_data may call sim.arm_a.run_arm_a,
+    sim.arm_a_holdout.run_arm_a_holdout (Phase 7 — deterministic given
+    (seed, fraction), the SAME contract as run_arm_a given seed), and
+    sim.cli.build_dataset, and nothing else from sim/. In particular,
+    NOT sim.environment or sim.population — those remain reachable only
+    transitively through run_arm_a / run_arm_a_holdout's own (separately
+    tested) internals, never imported directly here."""
     import sampark.models.training_data as td
 
     tree = ast.parse(inspect.getsource(td))
@@ -97,4 +101,4 @@ def test_training_data_reads_only_seed_scoped_public_functions():
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("sim"):
             imported_from_sim.append(node.module)
 
-    assert set(imported_from_sim) <= {"sim.arm_a", "sim.cli"}, imported_from_sim
+    assert set(imported_from_sim) <= {"sim.arm_a", "sim.arm_a_holdout", "sim.cli"}, imported_from_sim
