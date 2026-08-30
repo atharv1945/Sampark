@@ -1,0 +1,61 @@
+{
+  "arm": "B",
+  "seed": 7,
+  "ablation": "fifo_under_cap",
+  "backend": "postgres",
+  "aging_bonus_paise": 11070,
+  "merchant_budget_paise_per_window": 3679105,
+  "fifo_mode": true,
+  "constants_commit_sha": "aa87123aafdc9d812f5a01c04766c60b9198a2ce",
+  "ablation_note": "Ranking replaced by chronological FIFO, and admission BYPASSES expected_net > 0 entirely (deliberate \u2014 Design Lock \u00a714.4): isolates pure chronological throttling (hard caps, still fully enforced) from value-aware allocation.",
+  "compliance": {
+    "quiet_hour_violations": 0,
+    "contact_cap_24h_breaches": 0,
+    "contact_cap_7d_breaches": 0,
+    "customers_contacted_3plus_per_24h": 0,
+    "conflicting_action_incidents": 0,
+    "interlock_dispute_open_violations": 0,
+    "fact_unavailable_counts": {
+      "fact_unavailable.rto_flag": 3654,
+      "fact_unavailable.refund_in_flight": 8363,
+      "fact_unavailable.fraud_review": 7129,
+      "fact_unavailable.mandate_cancellation": 3475,
+      "fact_unavailable.consent_scope": 16989
+    },
+    "post_optout_contacts": null,
+    "consent_scope_violations": null,
+    "scope_violation_count": 0
+  },
+  "recovery_unit": "risk_item",
+  "total_contacts": 16989,
+  "total_recoveries": 4022,
+  "recovered_amount_paise": 1637588173,
+  "incentive_spend_paise": 20364814,
+  "recovered_amount_per_contact_paise": 96391.08676202249,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 4888,
+      "recoveries": 1134,
+      "recovered_amount_paise": 234325762,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 3654,
+      "recoveries": 906,
+      "recovered_amount_paise": 301802660,
+      "incentive_spend_paise": 15089691
+    },
+    "mandate_recovery_agent": {
+      "contacts": 3475,
+      "recoveries": 818,
+      "recovered_amount_paise": 263776272,
+      "incentive_spend_paise": 5275123
+    },
+    "receivables_agent": {
+      "contacts": 4972,
+      "recoveries": 1164,
+      "recovered_amount_paise": 837683479,
+      "incentive_spend_paise": 0
+    }
+  }
+}

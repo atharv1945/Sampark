@@ -1,0 +1,61 @@
+{
+  "arm": "B",
+  "seed": 42,
+  "ablation": "aging_zero",
+  "backend": "postgres",
+  "aging_bonus_paise": 0,
+  "merchant_budget_paise_per_window": 3679105,
+  "fifo_mode": false,
+  "constants_commit_sha": "aa87123aafdc9d812f5a01c04766c60b9198a2ce",
+  "ablation_note": "AGING_BONUS_PAISE = 0; admission rule (expected_net > 0) unchanged.",
+  "compliance": {
+    "quiet_hour_violations": 0,
+    "contact_cap_24h_breaches": 0,
+    "contact_cap_7d_breaches": 0,
+    "customers_contacted_3plus_per_24h": 0,
+    "conflicting_action_incidents": 0,
+    "interlock_dispute_open_violations": 0,
+    "fact_unavailable_counts": {
+      "fact_unavailable.rto_flag": 1751,
+      "fact_unavailable.refund_in_flight": 4350,
+      "fact_unavailable.fraud_review": 4384,
+      "fact_unavailable.mandate_cancellation": 2633,
+      "fact_unavailable.consent_scope": 10285
+    },
+    "post_optout_contacts": null,
+    "consent_scope_violations": null,
+    "scope_violation_count": 0
+  },
+  "recovery_unit": "risk_item",
+  "total_contacts": 10285,
+  "total_recoveries": 2673,
+  "recovered_amount_paise": 1557949319,
+  "incentive_spend_paise": 18196659,
+  "recovered_amount_per_contact_paise": 151477.81419543023,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 1717,
+      "recoveries": 472,
+      "recovered_amount_paise": 174886725,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 1751,
+      "recoveries": 491,
+      "recovered_amount_paise": 256755067,
+      "incentive_spend_paise": 12837534
+    },
+    "mandate_recovery_agent": {
+      "contacts": 2633,
+      "recoveries": 681,
+      "recovered_amount_paise": 267973440,
+      "incentive_spend_paise": 5359125
+    },
+    "receivables_agent": {
+      "contacts": 4184,
+      "recoveries": 1029,
+      "recovered_amount_paise": 858334087,
+      "incentive_spend_paise": 0
+    }
+  }
+}

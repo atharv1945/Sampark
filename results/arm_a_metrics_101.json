@@ -1,0 +1,36 @@
+{
+  "arm": "A",
+  "seed": 101,
+  "recovery_unit": "risk_item",
+  "total_contacts": 20000,
+  "total_recoveries": 4505,
+  "recovered_amount_paise": 1708277068,
+  "incentive_spend_paise": 23058263,
+  "recovered_amount_per_contact_paise": 85413.8534,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 5128,
+      "recoveries": 1135,
+      "recovered_amount_paise": 233778806,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 4833,
+      "recoveries": 1151,
+      "recovered_amount_paise": 315151362,
+      "incentive_spend_paise": 15757022
+    },
+    "mandate_recovery_agent": {
+      "contacts": 4974,
+      "recoveries": 1150,
+      "recovered_amount_paise": 365090057,
+      "incentive_spend_paise": 7301241
+    },
+    "receivables_agent": {
+      "contacts": 5065,
+      "recoveries": 1069,
+      "recovered_amount_paise": 794256843,
+      "incentive_spend_paise": 0
+    }
+  }
+}

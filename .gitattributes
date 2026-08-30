@@ -1,0 +1,3 @@
+# results/*.json are byte-compared evidence; core.autocrlf=true must not
+# rewrite their line endings differently on Windows and Linux checkouts.
+results/*.json text eol=lf

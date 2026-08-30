@@ -1,0 +1,62 @@
+{
+  "arm": "B",
+  "seed": 101,
+  "ablation": "phase6_model",
+  "backend": "postgres",
+  "aging_bonus_paise": 11070,
+  "merchant_budget_paise_per_window": 3679105,
+  "fifo_mode": false,
+  "scorer": "HeuristicScorer",
+  "constants_commit_sha": "78f5850c24969bfbbf0afde2b88fc9a8e3a4dcfc",
+  "ablation_note": "sampark.models.scorer.build_scorer() against the committed model artifact (sampark/models/artifact_data.py). Both uplift and fatigue-hazard models report available=False on this dataset (no treatment/control split; no opt-out labels -- see sampark/models/uplift.py, fatigue_hazard.py), so this deterministically falls back to HeuristicScorer and reproduces headline too. That is the honest Phase 6 result on this dataset, not a bug in the ablation.",
+  "compliance": {
+    "quiet_hour_violations": 0,
+    "contact_cap_24h_breaches": 0,
+    "contact_cap_7d_breaches": 0,
+    "customers_contacted_3plus_per_24h": 0,
+    "conflicting_action_incidents": 0,
+    "interlock_dispute_open_violations": 0,
+    "fact_unavailable_counts": {
+      "fact_unavailable.rto_flag": 1660,
+      "fact_unavailable.refund_in_flight": 4415,
+      "fact_unavailable.fraud_review": 4294,
+      "fact_unavailable.mandate_cancellation": 2634,
+      "fact_unavailable.consent_scope": 10350
+    },
+    "post_optout_contacts": null,
+    "consent_scope_violations": null,
+    "scope_violation_count": 0
+  },
+  "recovery_unit": "risk_item",
+  "total_contacts": 10350,
+  "total_recoveries": 2613,
+  "recovered_amount_paise": 1663905208,
+  "incentive_spend_paise": 16319531,
+  "recovered_amount_per_contact_paise": 160763.78821256038,
+  "by_agent": {
+    "payment_retry_agent": {
+      "contacts": 1781,
+      "recoveries": 433,
+      "recovered_amount_paise": 165914345,
+      "incentive_spend_paise": 0
+    },
+    "cart_recovery_agent": {
+      "contacts": 1660,
+      "recoveries": 428,
+      "recovered_amount_paise": 218986285,
+      "incentive_spend_paise": 10949117
+    },
+    "mandate_recovery_agent": {
+      "contacts": 2634,
+      "recoveries": 676,
+      "recovered_amount_paise": 268536493,
+      "incentive_spend_paise": 5370414
+    },
+    "receivables_agent": {
+      "contacts": 4275,
+      "recoveries": 1076,
+      "recovered_amount_paise": 1010468085,
+      "incentive_spend_paise": 0
+    }
+  }
+}

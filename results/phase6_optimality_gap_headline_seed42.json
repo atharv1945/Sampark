@@ -1,0 +1,57 @@
+{
+  "seed": 42,
+  "label": "headline",
+  "merchant_budget_paise_per_window": 3679105,
+  "sampling": "top 5 windows by total requested incentive ceiling (targeted at the windows most likely to be margin-constrained, NOT a random sample)",
+  "method": "exact per-window multiple-choice knapsack (dependency-light dynamic program), capacity discretized to the nearest 100 paise; no incentive downgrade inside the DP (lower-bounds the true achievable optimum); PER-WINDOW optimum, not whole-horizon (cross-window deferral dynamics not modeled)",
+  "granularity_paise": 100,
+  "mean_gap_ratio": 0.999635839783082,
+  "worst_case_gap_ratio": 0.9993971677229961,
+  "windows": [
+    {
+      "window_id": "2025-09-27",
+      "admitted_count": 347,
+      "total_requested_ceiling_paise": 2800682,
+      "capacity_paise": 3679105,
+      "achieved_expected_net_paise": 27963683.88210441,
+      "optimal_expected_net_paise": 27977579.056663916,
+      "gap_ratio": 0.9995033460711036
+    },
+    {
+      "window_id": "2025-09-24",
+      "admitted_count": 389,
+      "total_requested_ceiling_paise": 2754574,
+      "capacity_paise": 3679105,
+      "achieved_expected_net_paise": 38599006.20187602,
+      "optimal_expected_net_paise": 38599006.20187602,
+      "gap_ratio": 1.0
+    },
+    {
+      "window_id": "2025-09-11",
+      "admitted_count": 357,
+      "total_requested_ceiling_paise": 2741761,
+      "capacity_paise": 3679105,
+      "achieved_expected_net_paise": 32572566.420815002,
+      "optimal_expected_net_paise": 32592214.059429046,
+      "gap_ratio": 0.9993971677229961
+    },
+    {
+      "window_id": "2025-09-14",
+      "admitted_count": 389,
+      "total_requested_ceiling_paise": 2654502,
+      "capacity_paise": 3679105,
+      "achieved_expected_net_paise": 40310769.00433252,
+      "optimal_expected_net_paise": 40326026.239269406,
+      "gap_ratio": 0.9996216529036023
+    },
+    {
+      "window_id": "2025-09-22",
+      "admitted_count": 366,
+      "total_requested_ceiling_paise": 2559977,
+      "capacity_paise": 3679105,
+      "achieved_expected_net_paise": 32022115.330177024,
+      "optimal_expected_net_paise": 32033101.652010538,
+      "gap_ratio": 0.9996570322177083
+    }
+  ]
+}

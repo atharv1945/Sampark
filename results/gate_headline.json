@@ -1,0 +1,294 @@
+{
+  "ablation": "headline",
+  "seeds": [
+    7,
+    42,
+    101,
+    2024,
+    31337
+  ],
+  "mean_a_per_contact_paise": 89387.38057,
+  "mean_b_per_contact_paise": 156957.36981923878,
+  "min_uplift_ratio": 1.711386778074912,
+  "max_uplift_ratio": 1.8821746334249845,
+  "uplift_stdev": 0.06330661100650746,
+  "total_a_contacts": 100000,
+  "total_b_contacts": 51542,
+  "total_a_recovered_paise": 8938738057,
+  "total_b_recovered_paise": 8089920774,
+  "total_a_incentive_paise": 128017454,
+  "total_b_incentive_paise": 84670484,
+  "constants_commit_sha": "aa87123aafdc9d812f5a01c04766c60b9198a2ce",
+  "gate_passed": true,
+  "per_seed": [
+    {
+      "seed": 7,
+      "a_contacts": 20000,
+      "b_contacts": 10327,
+      "a_recovered_paise": 1818641960,
+      "b_recovered_paise": 1607087639,
+      "a_per_contact_paise": 90932.098,
+      "b_per_contact_paise": 155619.99021981214,
+      "uplift_ratio": 1.711386778074912,
+      "b_compliance": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1804,
+          "fact_unavailable.refund_in_flight": 4327,
+          "fact_unavailable.fraud_review": 4337,
+          "fact_unavailable.mandate_cancellation": 2533,
+          "fact_unavailable.consent_scope": 10327
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      }
+    },
+    {
+      "seed": 42,
+      "a_contacts": 20000,
+      "b_contacts": 10299,
+      "a_recovered_paise": 1793728300,
+      "b_recovered_paise": 1593664601,
+      "a_per_contact_paise": 89686.415,
+      "b_per_contact_paise": 154739.74181959414,
+      "uplift_ratio": 1.7253420355757798,
+      "b_compliance": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1756,
+          "fact_unavailable.refund_in_flight": 4356,
+          "fact_unavailable.fraud_review": 4395,
+          "fact_unavailable.mandate_cancellation": 2639,
+          "fact_unavailable.consent_scope": 10299
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      }
+    },
+    {
+      "seed": 101,
+      "a_contacts": 20000,
+      "b_contacts": 10350,
+      "a_recovered_paise": 1708277068,
+      "b_recovered_paise": 1663905208,
+      "a_per_contact_paise": 85413.8534,
+      "b_per_contact_paise": 160763.78821256038,
+      "uplift_ratio": 1.8821746334249845,
+      "b_compliance": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1660,
+          "fact_unavailable.refund_in_flight": 4415,
+          "fact_unavailable.fraud_review": 4294,
+          "fact_unavailable.mandate_cancellation": 2634,
+          "fact_unavailable.consent_scope": 10350
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      }
+    },
+    {
+      "seed": 2024,
+      "a_contacts": 20000,
+      "b_contacts": 10321,
+      "a_recovered_paise": 1776997800,
+      "b_recovered_paise": 1600097493,
+      "a_per_contact_paise": 88849.89,
+      "b_per_contact_paise": 155033.18409068888,
+      "uplift_ratio": 1.744888869200501,
+      "b_compliance": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1679,
+          "fact_unavailable.refund_in_flight": 4366,
+          "fact_unavailable.fraud_review": 4264,
+          "fact_unavailable.mandate_cancellation": 2585,
+          "fact_unavailable.consent_scope": 10321
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      }
+    },
+    {
+      "seed": 31337,
+      "a_contacts": 20000,
+      "b_contacts": 10245,
+      "a_recovered_paise": 1841092929,
+      "b_recovered_paise": 1625165833,
+      "a_per_contact_paise": 92054.64645,
+      "b_per_contact_paise": 158630.1447535383,
+      "uplift_ratio": 1.723217141892986,
+      "b_compliance": {
+        "quiet_hour_violations": 0,
+        "contact_cap_24h_breaches": 0,
+        "contact_cap_7d_breaches": 0,
+        "customers_contacted_3plus_per_24h": 0,
+        "conflicting_action_incidents": 0,
+        "interlock_dispute_open_violations": 0,
+        "fact_unavailable_counts": {
+          "fact_unavailable.rto_flag": 1763,
+          "fact_unavailable.refund_in_flight": 4326,
+          "fact_unavailable.fraud_review": 4335,
+          "fact_unavailable.mandate_cancellation": 2572,
+          "fact_unavailable.consent_scope": 10245
+        },
+        "post_optout_contacts": null,
+        "consent_scope_violations": null,
+        "scope_violation_count": 0
+      }
+    }
+  ],
+  "arm_a_compliance": {
+    "7": {
+      "quiet_hour_violations": 10059,
+      "contact_cap_24h_breaches": 2442,
+      "contact_cap_7d_breaches": 4098,
+      "conflicting_action_incidents": 1227,
+      "interlock_dispute_open_violations": 2719
+    },
+    "42": {
+      "quiet_hour_violations": 10054,
+      "contact_cap_24h_breaches": 2454,
+      "contact_cap_7d_breaches": 4063,
+      "conflicting_action_incidents": 1268,
+      "interlock_dispute_open_violations": 2848
+    },
+    "101": {
+      "quiet_hour_violations": 9984,
+      "contact_cap_24h_breaches": 2435,
+      "contact_cap_7d_breaches": 4122,
+      "conflicting_action_incidents": 1245,
+      "interlock_dispute_open_violations": 2754
+    },
+    "2024": {
+      "quiet_hour_violations": 9869,
+      "contact_cap_24h_breaches": 2448,
+      "contact_cap_7d_breaches": 4176,
+      "conflicting_action_incidents": 1271,
+      "interlock_dispute_open_violations": 2845
+    },
+    "31337": {
+      "quiet_hour_violations": 9931,
+      "contact_cap_24h_breaches": 2469,
+      "contact_cap_7d_breaches": 4158,
+      "conflicting_action_incidents": 1220,
+      "interlock_dispute_open_violations": 2826
+    }
+  },
+  "arm_b_compliance": {
+    "7": {
+      "quiet_hour_violations": 0,
+      "contact_cap_24h_breaches": 0,
+      "contact_cap_7d_breaches": 0,
+      "customers_contacted_3plus_per_24h": 0,
+      "conflicting_action_incidents": 0,
+      "interlock_dispute_open_violations": 0,
+      "fact_unavailable_counts": {
+        "fact_unavailable.rto_flag": 1804,
+        "fact_unavailable.refund_in_flight": 4327,
+        "fact_unavailable.fraud_review": 4337,
+        "fact_unavailable.mandate_cancellation": 2533,
+        "fact_unavailable.consent_scope": 10327
+      },
+      "post_optout_contacts": null,
+      "consent_scope_violations": null,
+      "scope_violation_count": 0
+    },
+    "42": {
+      "quiet_hour_violations": 0,
+      "contact_cap_24h_breaches": 0,
+      "contact_cap_7d_breaches": 0,
+      "customers_contacted_3plus_per_24h": 0,
+      "conflicting_action_incidents": 0,
+      "interlock_dispute_open_violations": 0,
+      "fact_unavailable_counts": {
+        "fact_unavailable.rto_flag": 1756,
+        "fact_unavailable.refund_in_flight": 4356,
+        "fact_unavailable.fraud_review": 4395,
+        "fact_unavailable.mandate_cancellation": 2639,
+        "fact_unavailable.consent_scope": 10299
+      },
+      "post_optout_contacts": null,
+      "consent_scope_violations": null,
+      "scope_violation_count": 0
+    },
+    "101": {
+      "quiet_hour_violations": 0,
+      "contact_cap_24h_breaches": 0,
+      "contact_cap_7d_breaches": 0,
+      "customers_contacted_3plus_per_24h": 0,
+      "conflicting_action_incidents": 0,
+      "interlock_dispute_open_violations": 0,
+      "fact_unavailable_counts": {
+        "fact_unavailable.rto_flag": 1660,
+        "fact_unavailable.refund_in_flight": 4415,
+        "fact_unavailable.fraud_review": 4294,
+        "fact_unavailable.mandate_cancellation": 2634,
+        "fact_unavailable.consent_scope": 10350
+      },
+      "post_optout_contacts": null,
+      "consent_scope_violations": null,
+      "scope_violation_count": 0
+    },
+    "2024": {
+      "quiet_hour_violations": 0,
+      "contact_cap_24h_breaches": 0,
+      "contact_cap_7d_breaches": 0,
+      "customers_contacted_3plus_per_24h": 0,
+      "conflicting_action_incidents": 0,
+      "interlock_dispute_open_violations": 0,
+      "fact_unavailable_counts": {
+        "fact_unavailable.rto_flag": 1679,
+        "fact_unavailable.refund_in_flight": 4366,
+        "fact_unavailable.fraud_review": 4264,
+        "fact_unavailable.mandate_cancellation": 2585,
+        "fact_unavailable.consent_scope": 10321
+      },
+      "post_optout_contacts": null,
+      "consent_scope_violations": null,
+      "scope_violation_count": 0
+    },
+    "31337": {
+      "quiet_hour_violations": 0,
+      "contact_cap_24h_breaches": 0,
+      "contact_cap_7d_breaches": 0,
+      "customers_contacted_3plus_per_24h": 0,
+      "conflicting_action_incidents": 0,
+      "interlock_dispute_open_violations": 0,
+      "fact_unavailable_counts": {
+        "fact_unavailable.rto_flag": 1763,
+        "fact_unavailable.refund_in_flight": 4326,
+        "fact_unavailable.fraud_review": 4335,
+        "fact_unavailable.mandate_cancellation": 2572,
+        "fact_unavailable.consent_scope": 10245
+      },
+      "post_optout_contacts": null,
+      "consent_scope_violations": null,
+      "scope_violation_count": 0
+    }
+  }
+}
