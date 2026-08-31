@@ -376,14 +376,23 @@ one and present it as settled.
 | 3 — Agent Registry | CLOSED |
 | 4 — Mediation core (hard gate) | CLOSED |
 | 5 — Audit chain / explainability | CLOSED |
-| 6 — Intelligence layer | CLOSED (evidence committed `510e5fa`) |
+| 6 — Intelligence layer | CLOSED (evidence committed `b8f0efc`) |
 | 7 — Attribution & policy compiler | **ENGINEERING CLOSED.** Evidence preserved at the documented seed-42 scope. Design decisions recorded in `DECISIONS.md`. See the three-way distinction below — this is not the same claim as "nothing remains." |
 | 8 — Demo surface | **CLOSED.** FastAPI + SSE + vanilla-JS one-screen trace, deterministic ~40s replay, all three §12.3 failures, all seven §12.4 chaos controls. Implemented, tested, demonstrated live, decisions recorded in `DECISIONS.md`, and committed. One owner validation item remains open and is named below — it is not an engineering gap. |
 | 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | **ENGINEERING CLOSED.** 50-point precommitted sensitivity sweep (all 6 predictions PASS), canonical A/B/H table, `ARCHITECTURE.md`, `DISCLAIMER.md`, README front matter, `policies/README.md`. Phase 4 protection intact; `sampark/` untouched. One owner validation item (cold-viewer) still open from Phase 8. |
 
-**PHASES 0–8 CLOSED. PHASE 9 NOT STARTED.**
+**PHASES 0–9 ENGINEERING CLOSED. ONE OWNER VALIDATION ITEM REMAINS.**
 
-The single item still outstanding anywhere in Phases 0–8 is Phase 8's
+**Commit-hash note.** The Phase 6-8 commits were rewritten by an owner rebase
+after the Phase 8 session. Hashes cited in the historical narratives below
+(`510e5fa`, `6e45855`, `d35540e`/`3c2ba16`) were accurate when written but are
+no longer reachable from `main`; a fresh clone cannot resolve them. Their
+current equivalents are `b8f0efc` (Phase 6 evidence), `14905e7` (Phase 7) and
+`9849126` (Phase 8). The historical text is left as written rather than
+silently rewritten; this note is the mapping. `aa87123` is unaffected and
+remains the Phase 4 protected baseline.
+
+The single item still outstanding anywhere in Phases 0-9 is Phase 8's
 cold-viewer criterion (spec §18.1: "someone who hasn't heard the pitch can
 watch it and tell you what got denied and why"). That is an OWNER VALIDATION
 — it requires showing the running demo to a person, which no test can do.
