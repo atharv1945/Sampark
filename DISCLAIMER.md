@@ -336,6 +336,16 @@ or logged at any point. The `person_id` never crosses into a ledger row.
   latency instrumentation exists anywhere in the codebase. It is reported as
   absent rather than estimated from an in-memory run, which would not represent
   the `SERIALIZABLE` round-trip that dominates real decision cost.
+- **Maintainability caveat: `sampark/demo/runner.py` is 668 lines**, large for a
+  single module. It was reviewed for correctness during the Phase 9 closure pass
+  — duplicated logic, shared database state, cleanup races, non-determinism and
+  untested paths — and no defect was found, so it was deliberately left alone
+  rather than refactored for aesthetics late in the project. It remains the
+  least approachable file in the repository for a new reader.
+- The full test suite genuinely runs the multi-hour PostgreSQL-marked tests, so
+  **CI takes roughly three and a half hours per push.** No marker split was
+  introduced, because making those tests skip without an owner decision would
+  undo the reason the PostgreSQL service was added to CI in the first place.
 
 ## 20. Single-merchant scope
 
