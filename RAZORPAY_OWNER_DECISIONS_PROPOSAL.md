@@ -276,6 +276,28 @@ ledger-check result process-wide; a NEGATIVE is deliberately never cached, so a
 blip can never withhold MCP for the life of the process. Both properties are
 asserted in `tests/integrations/test_mcp_and_gateway.py`.
 
+**4. A Phase 9 protection test whose premise expired.**
+`test_phase9_touched_no_file_under_sampark` asserted that
+`git diff 9849126..HEAD -- sampark/` is empty. That was exact while Phase 9 was
+the newest work, and became wrong the moment the Razorpay integration was
+committed: adding `sampark/integrations/` is the entire point of this phase, so
+the test reported a legitimate adapter as a Phase 9 violation. It surfaced when
+the owner committed the work mid-suite-run and HEAD moved `50260d0` ->
+`77b2eb6`.
+
+Re-anchored to the closed range `9849126..50260d0`, which states the intended
+fact permanently. Verified directly: Phase 9 really did touch nothing under
+`sampark/`. Phase 4 protection still compares against HEAD and was not
+weakened. Two NEW guards were added so protection stays live rather than the
+goalposts simply moving — a path allowlist for Phase 10 (negative-controlled
+against eight protected modules, all caught) and a git-free pin of the entire
+Phase 9 audit surface asserting it was extended by exactly one event type and
+lost nothing.
+
+**OWNER DECISION REQUIRED:** confirm that re-anchoring a Phase 9 test to Phase
+9's own endpoint is the right call, rather than allowlisting Phase 10 inside
+the original HEAD-relative assertion.
+
 **Not a code defect, but caused by this session and recorded anyway:** killing
 the full test suite mid-run (twice, to restart it after a code change) left a
 stray inert `public.budget_windows` row dated `2025-09-11`. That is the Phase 8

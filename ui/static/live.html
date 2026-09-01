@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAMPARK — Live Razorpay Test</title>
+<link rel="stylesheet" href="/static/navbar.css">
+<link rel="stylesheet" href="/static/shared.css">
+<link rel="stylesheet" href="/static/live.css">
+</head>
+<body>
+
+<nav class="sk-nav" aria-label="Primary">
+  <div class="sk-nav-brand">
+    <span class="sk-name">SAMPARK</span>
+    <span class="sk-sub">Recovery Intelligence for Razorpay</span>
+  </div>
+  <div class="sk-nav-links">
+    <a href="/">Overview</a>
+    <a href="/live" aria-current="page">Live Razorpay Test</a>
+    <a href="/system">System Simulation</a>
+  </div>
+  <div class="sk-nav-status">
+    <span class="sk-badge sk-badge-test">RAZORPAY TEST MODE</span>
+  </div>
+</nav>
+
+<!-- ===================== live environment strip ===================== -->
+<section class="envstrip">
+  <div class="shell-wide env-inner">
+    <div class="env-title">
+      <span class="eyebrow" style="margin:0">Live environment</span>
+      <h2>Razorpay Test Environment</h2>
+    </div>
+    <div class="env-lights" role="status" aria-live="polite">
+      <span class="light light-on" id="light-test">
+        <span class="dot dot-live"></span> TEST MODE
+      </span>
+      <span class="light" id="light-mcp">
+        <span class="dot dot-off"></span> <span id="light-mcp-text">MCP CHECKING…</span>
+      </span>
+      <span class="light" id="light-sam">
+        <span class="dot dot-off"></span> <span id="light-sam-text">SAMPARK IDLE</span>
+      </span>
+    </div>
+  </div>
+</section>
+
+<div class="honestbar">
+  <div class="shell-wide">
+    <b>A proposed integration &mdash; no real money moves.</b> SAMPARK is not deployed
+    inside Razorpay and Razorpay does not use it. The payment links, the payments, the
+    failures and the failure codes below come from Razorpay's <b>test</b> environment. Every decision is made by
+    SAMPARK's committed code and written to a hash-chained audit log. Anything that is
+    simulated, or that exists only as an untested capability, is labelled with the tags in
+    the legend at the bottom right — never blurred.
+  </div>
+</div>
+
+<main class="shell-wide live-main">
+
+  <!-- ======================== LEFT: the story ======================== -->
+  <section class="col-main">
+
+    <!-- The headline: same mechanism, two economic answers. -->
+    <div class="card cases-card">
+      <div class="card-head">
+        <div>
+          <p class="eyebrow" style="margin:0">The decision</p>
+          <h3>Same failure. Same mechanism. Different answer.</h3>
+        </div>
+        <span class="tag tag-live-sam" id="cases-tag">Live &middot; SAMPARK</span>
+      </div>
+
+      <div class="cases">
+        <article class="ccase" id="case-a" data-slot="0">
+          <header class="cc-head">
+            <span class="cc-role">Case A &middot; headline</span>
+            <span class="cc-amt" id="a-amount">&#8377;1,000</span>
+          </header>
+          <div class="cc-verdict" id="a-verdict">awaiting decision</div>
+          <dl class="cc-kv">
+            <div><dt>Payment</dt><dd class="mono" id="a-payment">—</dd></div>
+            <div><dt>Why it failed</dt><dd id="a-cause">—</dd></div>
+            <div><dt>Reason code</dt><dd class="mono" id="a-reason">—</dd></div>
+            <div><dt>Expected net</dt><dd id="a-net">—</dd></div>
+            <div><dt>Recovery</dt><dd id="a-recovery">—</dd></div>
+          </dl>
+          <p class="cc-note" id="a-note">
+            Below the economic bar on this data — a recovery attempt would cost more in
+            future recoveries than it could return.
+          </p>
+          <a class="btn btn-sm cc-open hide" id="a-open" target="_blank" rel="noopener noreferrer">
+            Open Razorpay Test Checkout &#8599;
+          </a>
+        </article>
+
+        <article class="ccase" id="case-b" data-slot="1">
+          <header class="cc-head">
+            <span class="cc-role">Case B &middot; contrast</span>
+            <span class="cc-amt" id="b-amount">&#8377;4,000</span>
+          </header>
+          <div class="cc-verdict" id="b-verdict">awaiting decision</div>
+          <dl class="cc-kv">
+            <div><dt>Payment</dt><dd class="mono" id="b-payment">—</dd></div>
+            <div><dt>Why it failed</dt><dd id="b-cause">—</dd></div>
+            <div><dt>Reason code</dt><dd class="mono" id="b-reason">—</dd></div>
+            <div><dt>Expected net</dt><dd id="b-net">—</dd></div>
+            <div><dt>Recovery</dt><dd id="b-recovery">—</dd></div>
+          </dl>
+          <p class="cc-note" id="b-note">
+            Above the bar — worth the contact, so a bounded intervention is issued and
+            executed.
+          </p>
+          <a class="btn btn-sm cc-open hide" id="b-open" target="_blank" rel="noopener noreferrer">
+            Open Razorpay Test Checkout &#8599;
+          </a>
+        </article>
+      </div>
+
+      <p class="tiny cases-foot">
+        <span class="tag tag-live-sam tag-plain">audit-derived</span>
+        Every verdict, reason code and expected-net figure above is read from a
+        <code>payment.risk_detected</code>, <code>decision.*</code> or <code>grant.*</code>
+        row in the audit chain. The amounts before a run are the configured demo amounts;
+        after a run they come from the chain too.
+      </p>
+    </div>
+
+    <!-- The live pipeline. -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <p class="eyebrow" style="margin:0">Live flow</p>
+          <h3>A stage lights only when its audit event arrives</h3>
+        </div>
+        <span class="tag tag-live-sam">Live &middot; SAMPARK</span>
+      </div>
+      <ol id="pipeline" class="pipeline">
+        <li data-node="detect"  ><span class="n">1</span><span class="s">Razorpay payment failed</span></li>
+        <li data-node="risk"    ><span class="n">2</span><span class="s">Revenue at risk identified</span></li>
+        <li data-node="request" ><span class="n">3</span><span class="s">Agent raises a signed request</span></li>
+        <li data-node="scope"   ><span class="n">4</span><span class="s">Registry &middot; capability scope</span></li>
+        <li data-node="policy"  ><span class="n">5</span><span class="s">Policy &middot; consent, quiet hours, contact caps</span></li>
+        <li data-node="allocate"><span class="n">6</span><span class="s">Expected recovery value &amp; allocation</span></li>
+        <li data-node="reserve" ><span class="n">7</span><span class="s">Reserve (SERIALIZABLE)</span></li>
+        <li data-node="execute" ><span class="n">8</span><span class="s">Execute &middot; channel provider</span></li>
+        <li data-node="settle"  ><span class="n">9</span><span class="s">Confirm | roll back</span></li>
+      </ol>
+      <div class="legend">
+        <span><i class="sw sw-granted"></i>admitted / granted</span>
+        <span><i class="sw sw-scope"></i>denied &middot; scope</span>
+        <span><i class="sw sw-policy"></i>denied / deferred &middot; policy, budget or value</span>
+        <span><i class="sw sw-rolled"></i>rolled back</span>
+        <span><i class="sw sw-pending"></i>reached &middot; no verdict</span>
+      </div>
+    </div>
+
+    <!-- The record. -->
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <p class="eyebrow" style="margin:0">Audit trace</p>
+          <h3>Click a row for the raw event and its explanation</h3>
+        </div>
+        <span class="count" id="event-count">0</span>
+      </div>
+      <div id="feed" class="feed empty">Nothing yet — run the test on the right.</div>
+    </div>
+
+  </section>
+
+  <!-- ====================== RIGHT: controls ====================== -->
+  <aside class="col-rail">
+
+    <div class="card">
+      <div class="card-head">
+        <div><h3 style="margin:0">Run the test</h3></div>
+        <span class="tag tag-arch tag-plain">operator control</span>
+      </div>
+      <ol id="steps" class="steps">
+        <li>
+          <div class="st-head"><b>1 &nbsp;Open a session</b>
+            <button id="btn-session" class="btn btn-sm btn-primary">Start</button></div>
+          <p class="st-note">Creates a throwaway PostgreSQL schema and registers
+            <code>payment_retry_agent</code>. The protected audit chain is never written to.</p>
+          <div class="st-out" id="out-session"></div>
+        </li>
+        <li>
+          <div class="st-head"><b>2 &nbsp;Create the &#8377;1,000 payment</b>
+            <button id="btn-link" class="btn btn-sm btn-primary">Create</button></div>
+          <p class="st-note">A real Razorpay Test Mode payment link. SMS and email
+            notifications are switched off — this demo never contacts a real person.</p>
+          <div class="st-out" id="out-link"></div>
+        </li>
+        <li>
+          <div class="st-head"><b>3 &nbsp;Create the contrast payment</b>
+            <span class="st-input"><label class="visually-hidden" for="contrast-amount">Contrast amount in rupees</label>
+              <input id="contrast-amount" type="number" min="1" step="1" value="4000"></span>
+            <button id="btn-contrast" class="btn btn-sm">Create</button></div>
+          <p class="st-note">A second real test payment, above the economic bar. This is what
+            makes the contrast visible.</p>
+          <div class="st-out" id="out-contrast"></div>
+        </li>
+        <li>
+          <div class="st-head"><b>4 &nbsp;Make them fail</b>
+            <button id="btn-refresh" class="btn btn-sm">Check status</button></div>
+          <p class="st-note">Open each checkout and pay with a Razorpay <b>test</b> card that
+            fails. Nothing here simulates the failure — Razorpay produces it and SAMPARK reads
+            the real error code back.
+            <a href="https://razorpay.com/docs/payments/payments/test-card-details/"
+               target="_blank" rel="noopener noreferrer">Test card reference &#8599;</a></p>
+          <div class="st-out" id="out-refresh"></div>
+        </li>
+        <li>
+          <div class="st-head"><b>5 &nbsp;Let SAMPARK decide</b>
+            <button id="btn-ingest" class="btn btn-sm btn-primary">Detect &amp; decide</button></div>
+          <p class="st-note">Reads each failed payment back from Razorpay, normalises it into a
+            risk item, and runs the unmodified decision path.</p>
+          <div class="st-out" id="out-ingest"></div>
+        </li>
+        <li>
+          <div class="st-head"><b>6 &nbsp;Prove it</b>
+            <button id="btn-verify" class="btn btn-sm">Verify chain</button>
+            <button id="btn-reset" class="btn btn-sm">Reset</button></div>
+          <p class="st-note">Recomputes every hash and checks the linkage.</p>
+          <div class="st-out" id="out-verify"></div>
+        </li>
+      </ol>
+      <div class="failinject">
+        <button id="btn-provider-fail" class="btn btn-sm">Force provider timeout</button>
+        <p class="st-note">Arms the mock channel so the next send fails. The grant rolls back,
+          budget and contact slot are released, and no double-send occurs.</p>
+      </div>
+    </div>
+
+    <!-- The MCP integration panel. -->
+    <div class="card mcp-card">
+      <div class="card-head">
+        <div><h3 style="margin:0">Razorpay MCP Server</h3></div>
+        <span class="tag tag-live-rzp" id="mcp-tag">Live &middot; Razorpay MCP</span>
+      </div>
+      <div class="mcp-grid">
+        <div><span>Server</span><b id="mcp-server">—</b></div>
+        <div><span>Version</span><b id="mcp-version">—</b></div>
+        <div><span>Tools available</span><b id="mcp-tools">—</b></div>
+        <div><span>Environment</span><b class="good">Test Mode</b></div>
+        <div><span>Preferred transport</span><b id="mcp-transport">—</b></div>
+        <div><span>Test-mode check</span><b id="mcp-modecheck">—</b></div>
+        <div class="mcp-wide"><span>Last operation performed</span><b id="mcp-last">none yet</b></div>
+      </div>
+
+      <p class="eyebrow mcp-sub">Operations SAMPARK uses</p>
+      <ul class="mcp-ops" id="mcp-ops">
+        <li data-op="create_payment_link"><span class="op">create_payment_link</span><span class="ok">—</span></li>
+        <li data-op="fetch_payment_link"><span class="op">fetch_payment_link</span><span class="ok">—</span></li>
+        <li data-op="fetch_payment"><span class="op">fetch_payment</span><span class="ok">—</span></li>
+        <li data-op="fetch_all_payments"><span class="op">fetch_all_payments</span><span class="ok">—</span></li>
+        <li data-op="fetch_all_payment_links"><span class="op">fetch_all_payment_links</span><span class="ok">—</span></li>
+      </ul>
+      <p class="tiny">
+        Four of the tools the server offers are used by the recovery flow; the fifth backs
+        the test-mode cross-check. A tick means the server confirmed it offers that tool —
+        <b>not</b> that every tool has been called in this session.
+      </p>
+
+      <div id="mcp-fallback" class="note note-warn hide"></div>
+
+      <p class="tiny mcp-foot">
+        The transport label is produced by the code path that actually ran. An MCP label
+        cannot appear unless a Razorpay MCP <code>tools/call</code> really returned — the
+        receipt that mints it is constructed in exactly one place in the repository, and a
+        test asserts that.
+      </p>
+      <div id="link-list" class="linklist"></div>
+    </div>
+
+    <!-- The raw record. -->
+    <div class="card">
+      <div class="card-head"><div><h3 style="margin:0">Raw audit event</h3></div>
+        <span class="tag tag-live-sam tag-plain">from the chain</span></div>
+      <pre id="raw">Select a row in the audit trace.
+
+Nothing on this page is synthesised: each field below is a column value from a
+row that sampark.audit.chain.append wrote. `hash` is recomputed from the event,
+never read from a column — there is no hash column, deliberately, because a
+stored hash can be tampered to agree with a tampered payload and a recomputed
+one cannot.</pre>
+      <p class="eyebrow" style="margin:14px 0 8px">Explanation
+        <span class="faint" style="text-transform:none;letter-spacing:0;font-weight:400">
+          &middot; from sampark.audit.explain, generated from the log — no LLM</span></p>
+      <div id="explanation" class="explain faint">Click an event carrying a request_id.</div>
+      <pre id="explain-events" class="pre-sm"></pre>
+    </div>
+
+    <!-- The provenance legend. -->
+    <div class="card">
+      <div class="card-head"><div><h3 style="margin:0">What is real on this page</h3></div></div>
+      <ul class="prov">
+        <li><span class="tag tag-live-rzp">Live &middot; Razorpay MCP</span>
+          <span>Payment-link creation and every read, performed against Razorpay's test
+            environment through the MCP server.</span></li>
+        <li><span class="tag tag-live-sam">Live &middot; SAMPARK</span>
+          <span>Risk detection, scope, policy, scoring, allocation, issuance, execution and
+            audit — executed here, now, and hash-chained.</span></li>
+        <li><span class="tag tag-sim">Simulated</span>
+          <span>The channel that would carry the message, and the optional provider timeout.
+            Nothing on this page is a simulated <em>Razorpay</em> response. The
+            <a href="/system">System Simulation</a> page is a fully synthetic world — its
+            customers, amounts and outcomes come from SAMPARK's committed seeded generator,
+            <b>not from Razorpay</b>.</span></li>
+        <li><span class="tag tag-arch">Architectural capability</span>
+          <span>Webhook delivery from Razorpay over the public internet. The receiver is
+            implemented and tested against genuine HMAC signatures; a local demo has no
+            public URL, so Razorpay has never delivered to it.</span></li>
+        <li><span class="tag tag-none">Not demonstrated</span>
+          <span>Live S2S payment initiation, and live LLM policy compilation.</span></li>
+      </ul>
+    </div>
+
+  </aside>
+</main>
+
+<div id="toast"></div>
+
+<script src="/static/live.js"></script>
+</body>
+</html>

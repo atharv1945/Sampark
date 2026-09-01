@@ -1,7 +1,6 @@
-/* SAMPARK product surface — the Razorpay Test Mode flow.
+/* SAMPARK — Live Razorpay Test page.
  *
- * THE TRACE-INTEGRITY RULE (spec §12.1), implemented here exactly as it is
- * in app.js:
+ * THE TRACE-INTEGRITY RULE (spec §12.1), implemented rather than asserted:
  *
  *   "The UI renders the audit log and nothing else."
  *
@@ -10,18 +9,18 @@
  *   auditState    SYSTEM TRUTH. Written by ingestAuditEvents() and by nothing
  *                 else, ever. ingestAuditEvents() is called from exactly two
  *                 functions — onSseMessage() (the SSE handler) and
- *                 backfillFrom() (the gap repair). Both carry nothing but
- *                 rows out of the audit_events table. The hero card, the
- *                 comparison table, the pipeline and the trace are rendered
- *                 from this and only this. Notably `expected_net_paise` — the
- *                 number that explains the whole decision — is READ OFF the
- *                 decision event, never recomputed in the browser.
+ *                 backfillFrom() (the gap repair). Both carry nothing but rows
+ *                 out of the audit_events table. Every verdict, reason code
+ *                 and expected-net figure on this page comes from here.
+ *                 `expected_net_paise` in particular is READ OFF the decision
+ *                 event, never recomputed in the browser — the allocator owns
+ *                 that arithmetic.
  *
  *   controlState  INTEGRATION CONTROL STATE. Session id, payment links,
- *                 transport labels, gateway fallback reasons, step output.
- *                 Real, but not system truth, so it renders only inside
- *                 regions marked "integration control" and never contributes
- *                 a pipeline node, a colour or a decision.
+ *                 transport labels, MCP capability, gateway fallback reasons,
+ *                 step output. Real, but not system truth, so it renders only
+ *                 in regions marked as operator control or MCP provenance and
+ *                 never contributes a pipeline node, a colour or a verdict.
  *
  *   ui            Pure presentation: selection, the SSE handle.
  *
@@ -50,7 +49,7 @@ const auditState = {
 
 /* =============== INTEGRATION CONTROL STATE (marked in the UI) ========= */
 
-const controlState = { session: null, links: [], transport: null, mcp: null };
+const controlState = { session: null, links: [], transport: null, mcp: null, modeCheck: null };
 
 /* ========================== PRESENTATION ============================= */
 
@@ -59,7 +58,7 @@ const ui = { selected: null, source: null };
 /* ===================================================================== */
 
 const NODE_FOR_TYPE = {
-  'payment.risk_detected': 'detect',
+  'payment.risk_detected': 'risk',
   'request.received': 'request',
   'request.denied_on_scope': 'scope',
   'grant.reserved': 'reserve',
@@ -69,9 +68,9 @@ const NODE_FOR_TYPE = {
   'grant.expired': 'settle'
 };
 
-/* A denial's reason code names the stage that produced it. `allocation.*` is
- * a comparative outcome from the allocator; `scope.*` is the registry;
- * everything else is a hard policy rule or a budget. Read off the event. */
+/* A denial's reason code names the stage that produced it. `scope.*` is the
+ * registry; `allocation.*` is the allocator's comparative outcome; everything
+ * else is a hard policy rule or a budget. Read off the event, never guessed. */
 function stageForReason(rc) {
   if (!rc) return 'policy';
   if (rc.indexOf('scope.') === 0) return 'scope';
@@ -102,8 +101,7 @@ function ingestAuditEvents(rows) {
     renderEventRow(ev);
     litNode(ev);
   }
-  renderHero();
-  renderComparison();
+  renderCases();
   document.getElementById('event-count').textContent = auditState.counts.events;
 }
 
@@ -112,10 +110,8 @@ function opportunity(riskId) {
     auditState.opportunities[riskId] = {
       risk_id: riskId, payment_id: null, amount_paise: null, root_cause: null,
       failure_code: null, method: null, transport: null, operation: null,
-      customer_id: null, decision: null, reason_code: null,
-      expected_net_paise: null, channel: null, intent: null,
-      incentive_ceiling_paise: null, send_after: null, grant_state: null,
-      request_id: null
+      customer_id: null, decision: null, reason_code: null, expected_net_paise: null,
+      channel: null, intent: null, grant_state: null, request_id: null
     };
     auditState.order.push(riskId);
   }
@@ -157,31 +153,26 @@ function tally(ev) {
     if (p.amount_paise !== undefined && o.amount_paise === null) o.amount_paise = p.amount_paise;
   }
   if (ev.event_type === 'grant.reserved') {
-    o.decision = 'GRANTED';
-    o.reason_code = null;
-    o.channel = p.channel;
-    o.intent = p.intent;
-    o.incentive_ceiling_paise = p.incentive_ceiling_paise;
-    o.send_after = p.send_after;
-    o.grant_state = 'RESERVED';
+    o.decision = 'GRANTED'; o.reason_code = null;
+    o.channel = p.channel; o.intent = p.intent; o.grant_state = 'RESERVED';
   }
   if (ev.event_type === 'grant.executing') o.grant_state = 'EXECUTING';
   if (ev.event_type === 'grant.confirmed') o.grant_state = 'CONFIRMED';
   if (ev.event_type === 'grant.rolled_back') { o.grant_state = 'ROLLED_BACK'; o.decision = 'ROLLED BACK'; }
 }
 
-/* ---------- rendering, entirely from auditState ---------- */
+/* ---------- rendering the two cases, entirely from auditState ---------- */
 
 function rupees(paise) {
-  if (paise === null || paise === undefined) return '₹—';
+  if (paise === null || paise === undefined) return '—';
   const sign = paise < 0 ? '−' : '';
   return sign + '₹' + (Math.abs(paise) / 100).toLocaleString('en-IN',
     { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const DECISION_CLASS = {
-  'GRANTED': 'hero-granted', 'DENIED': 'hero-denied',
-  'DEFERRED': 'hero-deferred', 'ROLLED BACK': 'hero-rolled'
+const CASE_CLASS = {
+  'GRANTED': 'is-granted', 'DENIED': 'is-denied',
+  'DEFERRED': 'is-deferred', 'ROLLED BACK': 'is-rolled'
 };
 
 function labelForTransport(t) {
@@ -191,83 +182,49 @@ function labelForTransport(t) {
   return t || '—';
 }
 
-/* The hero is the FIRST opportunity the chain recorded, which is the
- * headline payment: the product surface creates and polls the headline link
- * before any contrast link. */
-function heroOpportunity() {
-  return auditState.order.length ? auditState.opportunities[auditState.order[0]] : null;
-}
+function set(id, text) { document.getElementById(id).textContent = text; }
 
-function renderHero() {
-  const card = document.getElementById('hero');
-  const o = heroOpportunity();
-  if (!o) { card.className = 'card hero-idle'; return; }
-
-  const amount = document.getElementById('hero-amount');
-  amount.className = o.amount_paise === null || o.amount_paise === undefined ? 'idle' : '';
-  amount.textContent = amount.className === 'idle'
-    ? 'awaiting a failed payment' : rupees(o.amount_paise);
-  document.getElementById('hero-payment').textContent = o.payment_id || '—';
-  document.getElementById('hero-source').textContent =
-    'Razorpay Test Mode · via ' + labelForTransport(o.transport);
-
-  document.getElementById('hero-rootcause').textContent =
-    o.root_cause ? o.root_cause.replace(/_/g, ' ') : '—';
-  document.getElementById('hero-failcode').textContent =
-    (o.failure_code || 'waiting') + (o.method ? ' · ' + o.method : '');
-
-  document.getElementById('hero-decision').textContent = o.decision || 'deciding…';
-  document.getElementById('hero-reason').textContent =
-    o.reason_code || (o.decision === 'GRANTED' ? 'admitted by every hard rule, then won its window'
-                                               : 'the allocator has not run');
-
-  const iv = document.getElementById('hero-intervention');
-  const ivd = document.getElementById('hero-intervention-detail');
-  if (o.decision === 'GRANTED' || o.grant_state) {
-    iv.textContent = (o.intent || 'contact').replace(/_/g, ' ') + ' · ' + (o.channel || '');
-    ivd.textContent = 'incentive ceiling ' + rupees(o.incentive_ceiling_paise)
-      + ' · ' + (o.grant_state || '');
-  } else if (o.decision) {
-    iv.textContent = 'none — deliberately';
-    ivd.textContent = o.expected_net_paise !== null && o.expected_net_paise !== undefined
-      ? ('expected net ' + rupees(o.expected_net_paise)
-         + ' · no grant issued, nothing sent, no budget spent')
-      : 'no grant issued, nothing sent, no budget spent';
-  }
-  card.className = 'card ' + (DECISION_CLASS[o.decision] || 'hero-idle');
-}
-
-function renderComparison() {
-  const box = document.getElementById('comparison');
-  if (!auditState.order.length) { box.className = 'muted small'; return; }
-  box.className = '';
-  box.innerHTML = '';
-
-  const table = el('table', 'cmp');
-  const head = el('tr');
-  ['Payment', 'At risk', 'Why it failed', 'Expected net', 'Decision'].forEach(h => {
-    head.appendChild(el('th', null, h));
-  });
-  table.appendChild(head);
-
-  auditState.order.forEach(riskId => {
+/* Slot 0 is the headline case, slot 1 the contrast — insertion order in the
+ * chain, which follows the order the links were created and polled. */
+function renderCases() {
+  ['a', 'b'].forEach((key, slot) => {
+    const riskId = auditState.order[slot];
+    const card = document.getElementById('case-' + key);
+    if (!riskId) return;
     const o = auditState.opportunities[riskId];
-    const tr = el('tr', 'cmp-' + (o.decision === 'GRANTED' ? 'granted'
-      : o.decision === 'ROLLED BACK' ? 'rolled' : o.decision ? 'denied' : 'pending'));
-    tr.appendChild(el('td', 'mono', o.payment_id || '—'));
-    tr.appendChild(el('td', 'num', rupees(o.amount_paise)));
-    tr.appendChild(el('td', null, (o.root_cause || '—').replace(/_/g, ' ')));
-    tr.appendChild(el('td', 'num ' + (o.expected_net_paise < 0 ? 'bad' : 'good'),
-      o.expected_net_paise === null || o.expected_net_paise === undefined
-        ? (o.decision === 'GRANTED' ? 'positive' : '—') : rupees(o.expected_net_paise)));
-    const d = el('td', 'mono');
-    d.appendChild(el('b', null, o.decision || 'deciding…'));
-    if (o.reason_code) d.appendChild(el('div', 'small', o.reason_code));
-    tr.appendChild(d);
-    table.appendChild(tr);
+
+    card.className = 'ccase ' + (CASE_CLASS[o.decision] || '');
+    if (o.amount_paise !== null) set(key + '-amount', rupees(o.amount_paise));
+    set(key + '-payment', o.payment_id || '—');
+    set(key + '-cause', o.root_cause ? o.root_cause.replace(/_/g, ' ') : '—');
+    set(key + '-verdict', o.decision || 'deciding…');
+    set(key + '-reason', o.reason_code || (o.decision === 'GRANTED' ? 'clears the economic bar' : '—'));
+
+    const net = document.getElementById(key + '-net');
+    if (o.expected_net_paise === null || o.expected_net_paise === undefined) {
+      net.textContent = o.decision === 'GRANTED' ? 'positive' : '—';
+      net.className = o.decision === 'GRANTED' ? 'good' : '';
+    } else {
+      net.textContent = rupees(o.expected_net_paise);
+      net.className = o.expected_net_paise < 0 ? 'bad' : 'good';
+    }
+
+    let recovery = '—';
+    if (o.grant_state === 'CONFIRMED') recovery = 'Executed → CONFIRMED';
+    else if (o.grant_state === 'ROLLED_BACK') recovery = 'Rolled back — budget released';
+    else if (o.grant_state) recovery = o.grant_state;
+    else if (o.decision === 'DENIED') recovery = 'Not attempted';
+    else if (o.decision === 'DEFERRED') recovery = 'Deferred to a later window';
+    set(key + '-recovery', recovery);
+
+    if (o.transport) {
+      set(key + '-note', 'Read from Razorpay via ' + labelForTransport(o.transport)
+        + ', then decided by the shipped allocator.');
+    }
   });
-  box.appendChild(table);
 }
+
+/* ---------- the trace ---------- */
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -278,12 +235,14 @@ function el(tag, cls, text) {
 
 function renderEventRow(ev) {
   const feed = document.getElementById('feed');
-  feed.className = '';
+  feed.className = 'feed';
   const row = el('div', 'ev ' + classify(ev));
   row.appendChild(el('span', 'seq', '#' + ev.seq));
   row.appendChild(el('span', 'ty', ev.event_type));
   row.appendChild(el('span', 'rc', ev.reason_code || ''));
+  row.tabIndex = 0;
   row.onclick = () => select(ev, row);
+  row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(ev, row); } };
   feed.appendChild(row);
   feed.scrollTop = feed.scrollHeight;
 }
@@ -294,19 +253,23 @@ function litNode(ev) {
     node = stageForReason(ev.reason_code);
   }
   if (!node) return;
+  if (ev.event_type === 'payment.risk_detected') {
+    const first = document.querySelector('#pipeline li[data-node="detect"]');
+    if (first && !first.className) first.className = 'lit lit-pending';
+  }
   const li = document.querySelector('#pipeline li[data-node="' + node + '"]');
   if (!li) return;
   li.className = 'lit lit-' + classify(ev);
-  /* Reaching a later stage means the earlier ones admitted the candidate.
-   * That is read off THIS event, not assumed: a grant.reserved cannot exist
-   * unless scope, hard policy and allocation all passed, and an
-   * `allocation.*` denial cannot exist unless scope and hard policy passed. */
+  /* A later stage implies the earlier ones admitted the candidate. That is
+   * read off THIS event, not assumed: a grant.reserved cannot exist unless
+   * scope, hard policy and allocation all passed, and an `allocation.*`
+   * denial cannot exist unless scope and hard policy passed. */
   const priorFor = {
-    allocate: ['request', 'scope', 'policy'],
-    reserve: ['request', 'scope', 'policy', 'allocate'],
-    execute: ['request', 'scope', 'policy', 'allocate', 'reserve'],
-    settle: ['request', 'scope', 'policy', 'allocate', 'reserve', 'execute'],
-    policy: ['request', 'scope']
+    policy: ['detect', 'risk', 'request', 'scope'],
+    allocate: ['detect', 'risk', 'request', 'scope', 'policy'],
+    reserve: ['detect', 'risk', 'request', 'scope', 'policy', 'allocate'],
+    execute: ['detect', 'risk', 'request', 'scope', 'policy', 'allocate', 'reserve'],
+    settle: ['detect', 'risk', 'request', 'scope', 'policy', 'allocate', 'reserve', 'execute']
   };
   (priorFor[node] || []).forEach(prior => {
     const n = document.querySelector('#pipeline li[data-node="' + prior + '"]');
@@ -322,7 +285,7 @@ function select(ev, row) {
   const rid = ev.payload && ev.payload.request_id;
   if (rid) explainRequest(rid);
   else {
-    document.getElementById('explanation').className = 'muted';
+    document.getElementById('explanation').className = 'explain faint';
     document.getElementById('explanation').textContent =
       'This event carries no request_id, so there is no per-request explanation for it.';
     document.getElementById('explain-events').textContent = '';
@@ -331,13 +294,13 @@ function select(ev, row) {
 
 async function explainRequest(requestId) {
   const box = document.getElementById('explanation');
-  box.className = 'muted';
+  box.className = 'explain faint';
   box.textContent = 'explaining ' + requestId + '…';
   try {
     const r = await fetch('/api/integrations/razorpay/explain/request/' + requestId);
     const j = await r.json();
     if (!r.ok) { box.textContent = j.detail || ('HTTP ' + r.status); return; }
-    box.className = '';
+    box.className = 'explain';
     box.textContent = j.explanation;
     document.getElementById('explain-events').textContent =
       j.events.map(e => '#' + e.seq + '  ' + e.event_type + '  ' + (e.reason_code || '')).join('\n');
@@ -375,56 +338,104 @@ function openStream() {
 
 /* ---------- integration control state (never merged into the trace) --- */
 
-function renderIntegration() {
-  const t = controlState.transport;
+function renderMcp() {
+  const m = controlState.mcp, t = controlState.transport;
+  const light = document.getElementById('light-mcp');
+  const tag = document.getElementById('mcp-tag');
+
+  if (m && m.reachable) {
+    set('mcp-server', m.server.name);
+    set('mcp-version', m.server.version);
+    set('mcp-tools', String(m.tools.length));
+    light.className = 'light light-on';
+    light.querySelector('.dot').className = 'dot dot-live';
+    set('light-mcp-text', 'MCP CONNECTED');
+    tag.className = 'tag tag-live-rzp';
+    tag.textContent = 'Live · Razorpay MCP';
+    document.querySelectorAll('#mcp-ops li').forEach(li => {
+      const offered = m.tools.indexOf(li.dataset.op) !== -1;
+      li.className = offered ? 'on' : '';
+      li.querySelector('.ok').textContent = offered ? '✓' : '—';
+    });
+  } else if (m) {
+    set('mcp-server', 'not reachable');
+    set('mcp-version', '—');
+    set('mcp-tools', '—');
+    light.className = 'light light-warn';
+    light.querySelector('.dot').className = 'dot dot-off';
+    set('light-mcp-text', 'MCP UNAVAILABLE — REST FALLBACK');
+    tag.className = 'tag tag-arch';
+    tag.textContent = 'Fallback · Razorpay Test API';
+  }
+
+  /* PREFERRED is configuration; PERFORMED is what a transport actually did.
+   * Showing only the former beside the word "in use" would overclaim before a
+   * single call had been made. */
+  set('mcp-transport', t ? labelForTransport(t.preferred_transport) : '—');
+
   const links = controlState.links || [];
   const latest = links.length ? links[links.length - 1] : null;
-
-  document.getElementById('badge-transport').textContent =
-    t ? ('prefers ' + labelForTransport(t.preferred_transport)) : 'transport —';
-  document.getElementById('int-amount').textContent =
-    t ? (rupees(t.amount_paise) + ' headline · ' + rupees(t.contrast_amount_paise) + ' contrast') : '—';
-
-  const prov = latest && latest.provenance;
-  document.getElementById('int-transport').textContent =
-    prov ? labelForTransport(prov.transport) : (t ? 'not yet used' : '—');
-  document.getElementById('int-operation').textContent = prov ? prov.operation : '—';
-
-  const refs = document.getElementById('int-reference');
-  refs.textContent = links.length
-    ? links.map(l => l.role + ' ' + l.payment_link_id + ' (' + rupees(l.amount_paise) + ')').join('  |  ')
-    : '—';
-
-  const fb = document.getElementById('int-fallback');
-  const fallback = links.filter(l => l.fallback_reason);
-  if (fallback.length) {
-    fb.className = 'note warn';
-    fb.textContent = 'MCP was not used for at least one operation: ' + fallback[0].fallback_reason;
+  const last = document.getElementById('mcp-last');
+  if (latest && latest.provenance) {
+    last.textContent = latest.provenance.operation + ' via ' + labelForTransport(latest.provenance.transport);
+    last.className = latest.provenance.transport === 'mcp' ? 'good' : 'warnc';
   } else {
-    fb.className = 'note hidden';
+    last.textContent = 'none yet';
+    last.className = '';
+  }
+
+  const check = document.getElementById('mcp-modecheck');
+  if (controlState.modeCheck) {
+    check.textContent = controlState.modeCheck.same_test_ledger ? 'verified' : 'not verified';
+    check.className = controlState.modeCheck.same_test_ledger ? 'good' : 'warnc';
+  }
+
+  const fb = document.getElementById('mcp-fallback');
+  const fallen = (controlState.links || []).filter(l => l.fallback_reason);
+  if (fallen.length) {
+    fb.className = 'note note-warn';
+    fb.textContent = 'MCP was not used for at least one operation: ' + fallen[0].fallback_reason;
+  } else if (m && !m.reachable && m.reason) {
+    fb.className = 'note note-warn';
+    fb.textContent = m.reason;
+  } else {
+    fb.className = 'note note-warn hide';
     fb.textContent = '';
   }
 }
 
-function renderMcpCapability() {
-  const box = document.getElementById('mcp-capability');
-  const m = controlState.mcp;
-  if (!m) { box.textContent = ''; return; }
-  if (!m.reachable) {
-    box.className = 'note warn';
-    box.textContent = 'Razorpay MCP Server not reachable from this process: ' + (m.reason || 'unknown')
-      + '. The REST test API is used instead, and every transport label above says so.';
-    return;
-  }
-  box.className = 'note';
-  box.textContent = 'Razorpay MCP Server reachable (' + m.server.name + ' ' + m.server.version + '): '
-    + m.tools.length + ' tools offered; SAMPARK uses ' + m.tools_used_by_sampark.join(', ') + '.';
+function renderLinks() {
+  const box = document.getElementById('link-list');
+  box.innerHTML = '';
+  (controlState.links || []).forEach(link => {
+    const row = el('div', 'linkrow');
+    row.appendChild(el('span', 'role', link.role));
+    row.appendChild(el('span', null, link.payment_link_id));
+    row.appendChild(el('span', null, rupees(link.amount_paise)));
+    row.appendChild(el('span', null, 'via ' + labelForTransport(link.provenance.transport)));
+    box.appendChild(row);
+
+    /* The checkout button on the matching case card. It opens the REAL
+     * Razorpay test checkout — this page never imitates it. */
+    const key = link.role === 'contrast' ? 'b' : 'a';
+    const btn = document.getElementById(key + '-open');
+    if (link.short_url) { btn.href = link.short_url; btn.className = 'btn btn-sm cc-open'; }
+    const amount = document.getElementById(key + '-amount');
+    if (!auditState.order.length) amount.textContent = rupees(link.amount_paise);
+  });
+}
+
+function setSamparkLight(active, text) {
+  const light = document.getElementById('light-sam');
+  light.className = active ? 'light light-on' : 'light';
+  light.querySelector('.dot').className = active ? 'dot dot-live' : 'dot dot-off';
+  set('light-sam-text', text);
 }
 
 function stepOut(id, text, isErr) {
   const n = document.getElementById(id);
   n.textContent = text;
-  n.className = 'step-out' + (isErr ? ' err' : ' ok');
+  n.className = 'st-out' + (isErr ? ' err' : ' ok');
 }
 
 async function refreshState() {
@@ -433,14 +444,13 @@ async function refreshState() {
     controlState.session = s.session_id;
     controlState.links = s.payment_links || [];
     controlState.transport = s.transport;
-    document.getElementById('badge-session').textContent =
-      s.active ? ('session ' + s.session_id + ' · ' + s.demo_schema) : 'no session';
-    renderIntegration();
+    setSamparkLight(!!s.active, s.active ? 'SAMPARK ONLINE' : 'SAMPARK IDLE');
+    renderMcp();
+    renderLinks();
     /* A page reload during a demo would otherwise show an empty trace beside a
-     * live session. Reopening the stream replays it from seq 0, because a
-     * freshly loaded page has lastSeq = 0. Note this opens the AUDIT stream —
-     * it does not copy anything out of this /state response into auditState,
-     * which is what keeps the two stores separate. */
+     * live session. Reopening the AUDIT stream replays it from seq 0, because a
+     * freshly loaded page has lastSeq = 0. Nothing from this /state response is
+     * copied into auditState — that is what keeps the two stores separate. */
     if (s.active && !ui.source) openStream();
   } catch (e) { /* leave the last known control state */ }
 }
@@ -450,8 +460,8 @@ async function refreshHealth() {
     const h = await (await fetch('/api/integrations/razorpay/health?probe=true')).json();
     controlState.transport = h.transport;
     controlState.mcp = h.mcp_probe || null;
-    renderIntegration();
-    renderMcpCapability();
+    controlState.modeCheck = h.mcp_test_mode_check || null;
+    renderMcp();
   } catch (e) { /* health is best-effort; the page works without it */ }
 }
 
@@ -469,51 +479,46 @@ async function post(path, body) {
   return { ok: r.ok, status: r.status, body: await r.json() };
 }
 
-function renderLinkOut(outId, link) {
-  const out = document.getElementById(outId);
-  out.textContent = '';
-  out.className = 'step-out ok';
-  out.appendChild(el('div', null, link.payment_link_id + ' · ' + rupees(link.amount_paise)
-    + ' ' + link.currency + ' · via ' + labelForTransport(link.provenance.transport)));
-  if (link.short_url) {
-    const a = el('a', 'linkout', 'Open the Razorpay test checkout →');
-    a.href = link.short_url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-    out.appendChild(a);
-  }
-  if (link.fallback_reason) out.appendChild(el('div', 'warn', 'MCP not used: ' + link.fallback_reason));
-}
-
 /* ---------- buttons ---------- */
 
 document.getElementById('btn-session').onclick = async () => {
   const r = await post('/api/integrations/razorpay/session');
   if (!r.ok) { stepOut('out-session', r.body.detail || ('HTTP ' + r.status), true); return; }
   resetView();
-  stepOut('out-session', 'session ' + r.body.session_id + ' · schema ' + r.body.demo_schema
-    + ' · agent payment_retry_agent registered'
-    + (r.body.model_degraded ? ' · scorer ' + r.body.scorer
-        + ' (uplift model unavailable on this data — logged, not hidden)' : ''));
+  stepOut('out-session', 'session ' + r.body.session_id + '\nschema ' + r.body.demo_schema
+    + '\nagent payment_retry_agent registered'
+    + (r.body.model_degraded
+        ? '\nscorer ' + r.body.scorer + ' — the uplift model is unavailable on this data, and that is logged'
+        : ''));
   await refreshState();
   openStream();
 };
 
-document.getElementById('btn-link').onclick = async () => {
-  stepOut('out-link', 'creating the headline Razorpay Test Mode payment link…');
-  const r = await post('/api/integrations/razorpay/payment-link', { role: 'headline' });
-  if (!r.ok) { stepOut('out-link', r.body.detail || ('HTTP ' + r.status), true); return; }
-  renderLinkOut('out-link', r.body);
+async function createLink(role, outId, amountInr) {
+  stepOut(outId, 'creating a real Razorpay Test Mode payment link…');
+  const body = amountInr ? { role: role, amount_inr: amountInr } : { role: role };
+  const r = await post('/api/integrations/razorpay/payment-link', body);
+  if (!r.ok) { stepOut(outId, r.body.detail || ('HTTP ' + r.status), true); return; }
+  const link = r.body;
+  const out = document.getElementById(outId);
+  out.textContent = '';
+  out.className = 'st-out ok';
+  out.appendChild(el('div', null, link.payment_link_id + '  ' + rupees(link.amount_paise)
+    + '\nvia ' + labelForTransport(link.provenance.transport)));
+  if (link.short_url) {
+    const a = el('a', null, 'Open Razorpay Test Checkout ↗');
+    a.href = link.short_url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    out.appendChild(a);
+  }
+  if (link.fallback_reason) out.appendChild(el('div', 'warn', 'MCP not used: ' + link.fallback_reason));
   await refreshState();
-};
+}
 
-document.getElementById('btn-contrast').onclick = async () => {
+document.getElementById('btn-link').onclick = () => createLink('headline', 'out-link', null);
+
+document.getElementById('btn-contrast').onclick = () => {
   const raw = document.getElementById('contrast-amount').value;
-  const amount = raw ? parseInt(raw, 10) : null;
-  stepOut('out-contrast', 'creating the contrast payment link…');
-  const r = await post('/api/integrations/razorpay/payment-link',
-    amount ? { role: 'contrast', amount_inr: amount } : { role: 'contrast' });
-  if (!r.ok) { stepOut('out-contrast', r.body.detail || ('HTTP ' + r.status), true); return; }
-  renderLinkOut('out-contrast', r.body);
-  await refreshState();
+  createLink('contrast', 'out-contrast', raw ? parseInt(raw, 10) : null);
 };
 
 document.getElementById('btn-refresh').onclick = async () => {
@@ -521,7 +526,7 @@ document.getElementById('btn-refresh').onclick = async () => {
   const j = await r.json();
   if (!r.ok) { stepOut('out-refresh', j.detail || ('HTTP ' + r.status), true); return; }
   stepOut('out-refresh', (j.links || []).map(l =>
-    l.role + ' ' + l.payment_link_id + ': status ' + (l.status || '?') + ', '
+    l.role + '  ' + l.payment_link_id + '\n  status ' + (l.status || '?') + ' · '
     + (l.attempts || []).length + ' attempt(s), '
     + (l.attempts || []).filter(a => a.status === 'failed').length + ' failed'
     + ' · read via ' + labelForTransport(l.read_provenance.transport)).join('\n'));
@@ -534,22 +539,21 @@ document.getElementById('btn-ingest').onclick = async () => {
   if (!r.body.ingested) { stepOut('out-ingest', r.body.reason, true); return; }
   const lines = r.body.results.map(res => {
     const d = res.delivery;
-    return res.role + ' ' + res.payment_id + ' → ' + res.outcome
-      + (res.reason_code ? ' (' + res.reason_code + ')' : '')
-      + (res.duplicate ? ' · DUPLICATE, no second decision' : '')
-      + ' · matched by ' + (res.matcher || 'webhook')
-      + ' · windows ' + (res.windows_evaluated || []).join(', ')
-      + (d ? ' · ' + d.channel + ' attempts=' + d.attempts
+    return res.role + '  ' + res.payment_id + ' → ' + res.outcome
+      + (res.reason_code ? '\n  ' + res.reason_code : '')
+      + (res.duplicate ? '\n  DUPLICATE — no second decision' : '')
+      + '\n  matched by ' + (res.matcher || 'webhook')
+      + (d ? '\n  ' + d.channel + ' attempts=' + d.attempts
              + (d.rolled_back ? ' ROLLED BACK' : ' delivered') : '');
   });
-  (r.body.skipped || []).forEach(s => lines.push(s.role + ' ' + s.payment_link_id + ': ' + s.reason));
+  (r.body.skipped || []).forEach(s => lines.push(s.role + '  ' + s.payment_link_id + '\n  ' + s.reason));
   stepOut('out-ingest', lines.join('\n'));
   openStream();
 };
 
 document.getElementById('btn-provider-fail').onclick = async () => {
   const r = await post('/api/integrations/razorpay/provider-failure', { mode: 'hard_down' });
-  toast(r.ok ? 'provider armed (' + r.body.mode + ') — the next send fails, the grant rolls back'
+  toast(r.ok ? 'Provider armed (' + r.body.mode + ') — the next send fails and the grant rolls back'
              : (r.body.detail || ('HTTP ' + r.status)), !r.ok);
 };
 
@@ -558,9 +562,9 @@ document.getElementById('btn-verify').onclick = async () => {
   const j = await r.json();
   if (!r.ok) { stepOut('out-verify', j.detail || ('HTTP ' + r.status), true); return; }
   document.getElementById('raw').textContent = j.summary;
-  stepOut('out-verify', (j.valid ? 'chain VALID · ' : 'chain INVALID · ') + j.event_count
-    + ' events · genesis ' + j.genesis_ok + ' · linkage ' + j.linkage_ok
-    + ' · head ' + (j.head_hash || '').slice(0, 16) + '…', !j.valid);
+  stepOut('out-verify', (j.valid ? 'chain VALID' : 'chain INVALID')
+    + '\n' + j.event_count + ' events · genesis ' + j.genesis_ok + ' · linkage ' + j.linkage_ok
+    + '\nhead ' + (j.head_hash || '').slice(0, 24) + '…', !j.valid);
 };
 
 document.getElementById('btn-reset').onclick = async () => {
@@ -568,8 +572,8 @@ document.getElementById('btn-reset').onclick = async () => {
   await post('/api/integrations/razorpay/reset');
   resetView();
   ['out-session', 'out-link', 'out-contrast', 'out-refresh', 'out-ingest', 'out-verify']
-    .forEach(id => { const n = document.getElementById(id); n.textContent = ''; n.className = 'step-out'; });
-  toast('reset · demo schema dropped');
+    .forEach(id => { const n = document.getElementById(id); n.textContent = ''; n.className = 'st-out'; });
+  toast('Reset — demo schema dropped');
   refreshState();
 };
 
@@ -578,32 +582,27 @@ function resetView() {
   auditState.counts.events = 0;
   auditState.opportunities = {}; auditState.order = [];
   auditState.riskByRequest = {}; auditState.riskByGrant = {};
+
   const feed = document.getElementById('feed');
   feed.innerHTML = '';
-  feed.className = 'feed-empty-hint';
-  feed.textContent = 'Nothing yet. Start a session on the right.';
+  feed.className = 'feed empty';
+  feed.textContent = 'Nothing yet — run the test on the right.';
   document.querySelectorAll('#pipeline li').forEach(x => { x.className = ''; });
-  document.getElementById('event-count').textContent = '0';
-  document.getElementById('explanation').className = 'muted';
+  set('event-count', '0');
+  document.getElementById('explanation').className = 'explain faint';
   document.getElementById('explanation').textContent = 'Click an event carrying a request_id.';
   document.getElementById('explain-events').textContent = '';
-  const cmp = document.getElementById('comparison');
-  cmp.innerHTML = 'No opportunities yet.';
-  cmp.className = 'muted small';
-  document.getElementById('hero').className = 'card hero-idle';
-  const amount = document.getElementById('hero-amount');
-  amount.className = 'idle';
-  amount.textContent = 'awaiting a failed payment';
-  /* Every hero field, including the small detail lines under each heading.
-     Leaving those showing the previous payment's failure code after a Reset
-     is a small lie about what the page currently knows. */
-  const IDLE = {
-    'hero-source': 'Razorpay Test Mode', 'hero-payment': 'no payment yet',
-    'hero-rootcause': '—', 'hero-failcode': 'waiting for a failed payment',
-    'hero-decision': '—', 'hero-reason': 'the allocator has not run',
-    'hero-intervention': '—', 'hero-intervention-detail': 'no grant issued'
-  };
-  for (const id of Object.keys(IDLE)) document.getElementById(id).textContent = IDLE[id];
+
+  /* Both case cards back to "not yet decided". Leaving a previous run's
+   * verdict on screen after a reset would be a small lie about what the page
+   * currently knows. */
+  ['a', 'b'].forEach(key => {
+    document.getElementById('case-' + key).className = 'ccase';
+    set(key + '-verdict', 'awaiting decision');
+    ['payment', 'cause', 'reason', 'net', 'recovery'].forEach(f => set(key + '-' + f, '—'));
+    document.getElementById(key + '-net').className = '';
+  });
+  renderLinks();
 }
 
 refreshState();

@@ -1,0 +1,82 @@
+/* SAMPARK — the shared navigation strip, and NOTHING else.
+ *
+ * Deliberately self-contained. `/system` is Phase 8's screen and loads its own
+ * `styles.css`, which declares `:root` custom properties with the SAME names as
+ * the product pages' design system (`--bg`, `--line`, `--granted`, ...) and a
+ * fixed-height `body { display:flex; height:100vh; overflow:hidden }`. Loading
+ * the full product stylesheet there would silently re-style Phase 8's layout —
+ * a presentation change to a screen that is supposed to be unchanged.
+ *
+ * So this file:
+ *   - declares no `:root` variables and no element selectors (`body`, `a`,
+ *     `h2` ...), only `.sk-*` classes;
+ *   - hard-codes its own colours rather than reading shared ones;
+ *   - is the only stylesheet all three pages have in common.
+ */
+
+.sk-nav {
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+  padding: 12px 28px; flex: none;
+  background: #0b0f17;
+  border-bottom: 1px solid #212b3d;
+  font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.sk-nav-brand { display: flex; flex-direction: column; line-height: 1.25; }
+.sk-nav-brand .sk-name {
+  font-size: 17px; font-weight: 700; letter-spacing: .17em; color: #eaf0fa;
+}
+.sk-nav-brand .sk-sub { font-size: 11.5px; color: #6b7a93; letter-spacing: .01em; }
+
+.sk-nav-links { display: flex; gap: 4px; margin-left: 12px; }
+.sk-nav-links a {
+  font-size: 13.5px; font-weight: 500; padding: 8px 15px; border-radius: 9px;
+  color: #9aa8be; text-decoration: none; border: 1px solid transparent;
+  white-space: nowrap; transition: background .18s ease, color .18s ease;
+}
+.sk-nav-links a:hover { background: #161e2d; color: #eaf0fa; text-decoration: none; }
+.sk-nav-links a[aria-current="page"] {
+  background: rgba(61, 125, 255, .12); color: #b9d0ff; border-color: rgba(61, 125, 255, .38);
+}
+.sk-nav-links a:focus-visible { outline: 2px solid #3d7dff; outline-offset: 2px; }
+
+.sk-nav-status { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; align-items: center; }
+.sk-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+  font-size: 11px; padding: 6px 12px; border-radius: 999px;
+  background: #161e2d; border: 1px solid #212b3d; color: #9aa8be; white-space: nowrap;
+}
+.sk-badge-test {
+  background: rgba(20, 184, 166, .12); border-color: rgba(20, 184, 166, .5);
+  color: #5eead4; font-weight: 700; letter-spacing: .04em;
+}
+
+@media (max-width: 760px) {
+  .sk-nav { gap: 12px; padding: 10px 16px; }
+  .sk-nav-links { margin-left: 0; }
+}
+
+/* The orientation strip on `/system`. Static text only — it renders no state,
+   so it cannot become a second source of system truth. Same `.sk-` scoping
+   rule as everything else in this file. */
+.sk-strip {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap; flex: none;
+  padding: 10px 28px; background: #0d111a; border-bottom: 1px solid #212b3d;
+  font: 12.5px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #9aa8be;
+}
+.sk-strip b { color: #eaf0fa; }
+.sk-strip-tag {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 6px;
+  background: rgba(167, 139, 250, .12); color: #c4b5fd; border: 1px solid rgba(167, 139, 250, .4);
+}
+.sk-strip-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.sk-strip-steps { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.sk-strip-steps span {
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, monospace; font-size: 11px;
+  padding: 4px 10px; border-radius: 999px; background: #161e2d; border: 1px solid #212b3d; color: #9aa8be;
+}
+@media (max-width: 900px) { .sk-strip-steps { margin-left: 0; } }

@@ -1068,6 +1068,69 @@ written into the gitignored `.env` (D-9); whether to exercise the webhook over
 a public tunnel. Plus everything already open from Phases 0-9, unchanged —
 notably Phase 8's cold-viewer criterion.
 
+**Phase 10b — the three-page product presentation layer (same phase,
+presentation only).** `/` is now an Overview page that renders NO system state
+(no fetch, no SSE, no audit store — asserted), `/live` is the Razorpay Test
+surface (the former `/`), and `/system` is Phase 8's screen. New:
+`ui/static/{navbar,shared,overview,live}.css`, `overview.{html,js}`,
+`live.{html,js}`; `product.*` was retired into `live.*`.
+
+**Phase 8's screen was NOT restructured**, deliberately. `ui/static/app.js`,
+`ui/static/styles.css` and `ui/sse.py` remain BYTE-IDENTICAL, and
+`ui/static/index.html` differs only by two additive static blocks — the shared
+navigation strip and a four-step orientation strip.
+`tests/ui/test_product_surface.py::test_only_the_navigation_was_added_to_the_phase_8_page`
+asserts by `git diff` that NO line was removed and that the addition contains
+no `<script`, no `fetch(`, no `EventSource` and no `auditState` reference. The
+shared `navbar.css` is scoped entirely to `.sk-*` classes and declares no
+`:root` variables and no element selectors, because `styles.css` declares
+custom properties with the SAME names (`--bg`, `--line`, `--granted`, ...) and
+a fixed-height flex `body` — a shared stylesheet would have silently re-styled
+a page that is supposed to be unchanged. That constraint is a test too.
+
+**A four-label provenance vocabulary** (`Live · Razorpay MCP`,
+`Live · SAMPARK`, `Simulated`, `Architectural capability`, plus
+`Not demonstrated`) is used identically on both new pages and is enforced
+statically, as are the prohibited claims: no page may say Razorpay uses or
+deployed SAMPARK, that recovery is greater, or that the ML model helped.
+
+**A Phase 9 test whose premise expired, and why it is now stronger.**
+`tests/sim_sensitivity/test_phase4_protection.py::test_phase9_touched_no_file_under_sampark`
+compared `9849126..HEAD` over `sampark/`. That was exact while Phase 9 was the
+newest work; it became wrong the moment Phase 10 was committed, because adding
+`sampark/integrations/` is precisely what Phase 10 is for — so the test
+reported Phase 10's legitimate adapter as a Phase 9 violation. Surfaced by the
+owner committing the integration mid-suite-run (HEAD moved `50260d0` ->
+`77b2eb6`).
+
+The assertion is now anchored to `9849126..50260d0`, which states the fact it
+was always trying to state — *Phase 9 touched nothing under `sampark/`* — as a
+permanent property of a closed range that no later phase can make lie.
+Verified directly: that range under `sampark/` is EMPTY. Phase 4 protection
+itself still compares against HEAD and is untouched.
+
+Two guards were ADDED rather than the goalposts merely moved:
+`test_phase10_confined_itself_to_the_integration_layer` (Phase 10 may add
+`sampark/integrations/**` and `sampark/demo/razorpay_product.py`, and may
+extend exactly the three audit modules — anything else under `sampark/` fails;
+negative-controlled against `allocator/greedy.py`, `policy/hard/*`,
+`budget/issuance.py`, `schema.sql`, `registry/scope.py`, `mediation/service.py`,
+`audit/chain.py` and `models/scorer.py`, all CAUGHT), and
+`test_the_phase9_audit_surface_was_extended_and_never_reduced`, a git-free pin
+of all 16 Phase-9-era event types, 15 emitters and 15 sink methods, asserting
+the vocabulary grew by exactly `payment.risk_detected` and lost nothing.
+
+**Verified after this layer.** Full regression, run fresh after every change:
+**1232 passed, 3 skipped**, exit 0, 7084.30s (1:58:04) — the 3 skips are the
+pre-existing, unrelated `tests/budget/test_precheck.py` redis skips. Subsets:
+`tests/ui` 109, `tests/integrations` 108, `tests/audit` 120, `tests/demo` 97,
+`tests/ui/test_product_surface.py` 44 (up from 32),
+`tests/sim_sensitivity/test_phase4_protection.py` 9 (up from 7). `python -m sampark.audit.verify` VALID: True, 560 events, head
+`bf4ad0d0...b18244` unchanged. `python -m sim.gate` PASS, mean A 89387.38,
+mean B 156957.37, `constants_commit_sha aa87123...`. `git diff --check` clean.
+All protected paths and `results/`, `sim/`, `agents/`, `policies/`,
+`DECISIONS.md` untouched.
+
 ---
 
 Update this section at each phase boundary.

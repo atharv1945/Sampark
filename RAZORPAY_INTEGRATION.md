@@ -381,6 +381,23 @@ All under `/api/integrations/razorpay`.
 
 ---
 
+## 13A. The three product surfaces
+
+| Route | Page | What it renders |
+|---|---|---|
+| `/` | Overview | Static product narrative. **No system state at all** — no fetch, no SSE, no audit store, asserted by `tests/ui/test_product_surface.py::test_the_overview_renders_no_system_state`. Every figure is a committed `results/*.json` value, quoted and sourced on screen. |
+| `/live` | Live Razorpay Test | The Razorpay Test Mode flow. Two case cards (₹1,000 headline, ₹4,000 contrast) rendered entirely from the audit chain, the MCP capability panel, the live pipeline and the audit trace. |
+| `/system` | System Simulation | Phase 8's screen, unchanged. `app.js`, `styles.css` and `ui/sse.py` are byte-identical to the Phase 8 commit; `index.html` differs only by the shared navigation strip and a static orientation strip, and a test asserts no line was removed and that the addition contains no script, fetch or audit-store reference. |
+
+All three carry the same `navbar.css`, which is scoped entirely to `.sk-*`
+classes and declares no `:root` variables and no element selectors — because
+Phase 8's `styles.css` declares custom properties with the same names as the
+product design system and a fixed-height flex `body`, so a shared stylesheet
+would silently re-style a page that is meant to be unchanged. That constraint
+is itself a test.
+
+---
+
 ## 14. Reproducing all of this
 
 ```bash

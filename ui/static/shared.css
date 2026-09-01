@@ -1,0 +1,206 @@
+/* SAMPARK — shared design system.
+ *
+ * The provenance-label vocabulary and the primitives (surface, card, button,
+ * stat, note) that the Overview and Live pages both use.
+ *
+ * `/system` deliberately does NOT load this file. Phase 8's `styles.css`
+ * declares `:root` custom properties with the same names as these
+ * (`--bg`, `--line`, `--granted`, ...) and a fixed-height
+ * `body { display:flex; height:100vh; overflow:hidden }`; loading this on top
+ * would silently re-style a screen that is supposed to be unchanged. The one
+ * stylesheet all three pages share is `navbar.css`, which is scoped to `.sk-*`
+ * classes and declares no variables and no element selectors at all.
+ *
+ * Vanilla CSS, no framework (spec §12.2, "zero framework debt").
+ *
+ * Sized for a screen recording: 15px base, generous line-height, and nothing
+ * load-bearing below 12px.
+ */
+
+:root {
+  --bg: #090c13;
+  --bg-soft: #0d111a;
+  --surface: #111825;
+  --surface-2: #161e2d;
+  --surface-3: #1c2537;
+  --line: #212b3d;
+  --line-soft: #1a2233;
+
+  --ink: #eaf0fa;
+  --ink-2: #9aa8be;
+  --ink-3: #6b7a93;
+
+  --brand: #3d7dff;
+  --brand-soft: rgba(61, 125, 255, .12);
+  --teal: #14b8a6;
+  --teal-soft: rgba(20, 184, 166, .12);
+  --green: #22c55e;
+  --green-soft: rgba(34, 197, 94, .12);
+  --red: #f43f5e;
+  --red-soft: rgba(244, 63, 94, .12);
+  --amber: #f59e0b;
+  --amber-soft: rgba(245, 158, 11, .12);
+  --violet: #a78bfa;
+  --violet-soft: rgba(167, 139, 250, .12);
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius: 14px;
+  --shell: 1280px;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 6px; }
+
+/* ======================= provenance vocabulary ======================
+ * FOUR labels, used identically on every page. The whole point is that a
+ * viewer never has to wonder whether something was real.
+ *   live-rzp   the Razorpay MCP Server really performed this
+ *   live-sam   SAMPARK really did this, here, now
+ *   sim        SAMPARK's synthetic simulation — no Razorpay involvement
+ *   arch       the mechanism exists and is tested, but was not exercised
+ * ==================================================================== */
+
+.tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+  padding: 4px 9px; border-radius: 6px; white-space: nowrap; text-transform: uppercase;
+  border: 1px solid transparent; vertical-align: middle;
+}
+.tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.tag-live-rzp { background: var(--teal-soft); color: #5eead4; border-color: rgba(20, 184, 166, .4); }
+.tag-live-sam { background: var(--brand-soft); color: #a8c6ff; border-color: rgba(61, 125, 255, .4); }
+.tag-sim      { background: var(--violet-soft); color: #c4b5fd; border-color: rgba(167, 139, 250, .4); }
+.tag-arch     { background: var(--amber-soft); color: #fcd34d; border-color: rgba(245, 158, 11, .4); }
+.tag-none     { background: var(--surface-3); color: var(--ink-3); border-color: var(--line); }
+.tag-plain::before { display: none; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--mono); font-size: 11px; padding: 6px 12px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2);
+  white-space: nowrap;
+}
+.badge-test {
+  background: var(--teal-soft); border-color: rgba(20, 184, 166, .5);
+  color: #5eead4; font-weight: 700; letter-spacing: .04em;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.dot-live { background: var(--green); box-shadow: 0 0 0 3px rgba(34, 197, 94, .18); }
+.dot-off  { background: var(--ink-3); }
+
+/* ============================ primitives ============================ */
+
+.shell { max-width: var(--shell); margin: 0 auto; padding: 0 28px; }
+.shell-wide { max-width: 1560px; margin: 0 auto; padding: 0 28px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 22px 24px;
+}
+.card-quiet { background: var(--bg-soft); }
+
+.eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 10px;
+}
+h1, h2, h3 { margin: 0 0 12px; letter-spacing: -.015em; line-height: 1.2; }
+h1 { font-size: 46px; font-weight: 750; }
+h2 { font-size: 27px; font-weight: 700; }
+h3 { font-size: 17px; font-weight: 650; }
+p { margin: 0 0 14px; }
+.lede { font-size: 17px; line-height: 1.65; color: var(--ink-2); }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+.small { font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+.tiny { font-size: 11.5px; line-height: 1.55; color: var(--ink-3); }
+.mono { font-family: var(--mono); }
+.hide { display: none !important; }
+.good { color: var(--green); }
+.bad { color: var(--red); }
+.warnc { color: var(--amber); }
+
+code {
+  font-family: var(--mono); font-size: .88em; color: #c3d3f0;
+  background: var(--bg-soft); padding: 2px 6px; border-radius: 5px;
+  border: 1px solid var(--line-soft);
+}
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: inherit; font-size: 14px; font-weight: 600; padding: 11px 20px;
+  border-radius: 10px; cursor: pointer; text-decoration: none;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  transition: border-color .18s ease, background .18s ease, transform .1s ease;
+}
+.btn:hover { border-color: var(--brand); text-decoration: none; }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-primary {
+  background: linear-gradient(180deg, #4a87ff, #2f6ded);
+  border-color: #4a87ff; color: #fff;
+}
+.btn-primary:hover { filter: brightness(1.08); border-color: #6d9dff; }
+.btn-sm { font-size: 12.5px; padding: 7px 14px; border-radius: 8px; }
+
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1080px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+@media (max-width: 620px) { .grid-4 { grid-template-columns: 1fr; } }
+
+.stat { display: flex; flex-direction: column; gap: 4px; }
+.stat .n { font-size: 34px; font-weight: 750; letter-spacing: -.02em; line-height: 1.1; }
+.stat .k { font-size: 12.5px; color: var(--ink-2); }
+
+.rule { height: 1px; background: var(--line); border: 0; margin: 0; }
+
+.note {
+  border-left: 3px solid var(--line); padding: 2px 0 2px 14px;
+  font-size: 13px; line-height: 1.65; color: var(--ink-2);
+}
+.note-warn { border-left-color: var(--amber); }
+.note-good { border-left-color: var(--green); }
+.note-brand { border-left-color: var(--brand); }
+
+/* scrollable regions never push the page sideways */
+.scroll-x { overflow-x: auto; }
+
+/* ============================== toast =============================== */
+
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(160%);
+  background: var(--surface-2); border: 1px solid var(--brand); color: var(--ink);
+  padding: 12px 20px; border-radius: 11px; font-size: 13.5px; max-width: 80vw;
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1); z-index: 60;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .45);
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+#toast.err { border-color: var(--red); }
+
+/* ============================== motion ============================== */
+
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAMPARK — Recovery Intelligence for Razorpay</title>
+<link rel="stylesheet" href="/static/navbar.css">
+<link rel="stylesheet" href="/static/shared.css">
+<link rel="stylesheet" href="/static/overview.css">
+</head>
+<body>
+
+<nav class="sk-nav" aria-label="Primary">
+  <div class="sk-nav-brand">
+    <span class="sk-name">SAMPARK</span>
+    <span class="sk-sub">Recovery Intelligence for Razorpay</span>
+  </div>
+  <div class="sk-nav-links">
+    <a href="/" aria-current="page">Overview</a>
+    <a href="/live">Live Razorpay Test</a>
+    <a href="/system">System Simulation</a>
+  </div>
+  <div class="sk-nav-status">
+    <span class="sk-badge sk-badge-test">RAZORPAY TEST MODE</span>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ============================ HERO ============================ -->
+  <section class="hero">
+    <div class="shell hero-inner">
+      <div class="hero-copy">
+        <p class="eyebrow">Agent-based payment recovery</p>
+        <h1>Recover smarter.<br>Not harder.</h1>
+        <p class="lede">
+          SAMPARK is a recovery <b>decision layer</b>. It detects revenue at risk from
+          failed payments, works out whether an intervention is actually worth making,
+          checks that it is allowed, chooses which agent may act — and records every
+          step in a verifiable audit trail.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="/live">Run Razorpay Test &rarr;</a>
+          <a class="btn" href="/system">Explore System</a>
+        </div>
+        <p class="tiny hero-honest">
+          A <b>proposed</b> integration, running against Razorpay Test Mode. SAMPARK is not
+          deployed inside Razorpay, Razorpay does not use it, and no real money moves.
+        </p>
+      </div>
+
+      <!-- The whole product in one figure. -->
+      <div class="hero-figure" aria-label="How a failed payment flows through SAMPARK">
+        <div class="hf-row hf-src">
+          <span class="hf-chip">Razorpay</span>
+          <span class="hf-txt">payment fails</span>
+        </div>
+        <div class="hf-arrow" aria-hidden="true"></div>
+        <div class="hf-box">
+          <div class="hf-title">SAMPARK</div>
+          <ul class="hf-steps">
+            <li>Detect revenue at risk</li>
+            <li>Estimate recovery value</li>
+            <li>Check policy &amp; consent</li>
+            <li>Select the agent</li>
+            <li>Recover within bounds</li>
+            <li>Audit the outcome</li>
+          </ul>
+        </div>
+        <div class="hf-arrow" aria-hidden="true"></div>
+        <div class="hf-split">
+          <div class="hf-out hf-deny">
+            <b>DENY</b>
+            <span>not worth it</span>
+          </div>
+          <div class="hf-out hf-grant">
+            <b>RECOVER</b>
+            <span>worth it</span>
+          </div>
+        </div>
+        <div class="hf-arrow" aria-hidden="true"></div>
+        <div class="hf-row hf-verify"><span class="hf-txt">Verified, hash-chained trace</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== WHAT IS THE PROBLEM ====================== -->
+  <section class="band">
+    <div class="shell">
+      <p class="eyebrow">The problem</p>
+      <h2>A failed payment is not automatically worth chasing.</h2>
+      <p class="lede section-lede">
+        Every recovery attempt spends something real: a message to a customer, a slot in
+        that customer's limited attention, agent capacity, merchant discount budget, and
+        a step down the curve of how likely they are to respond next time. Spend those on
+        the wrong payment and you have made the next recovery harder <em>and</em> lost
+        money doing it.
+      </p>
+
+      <div class="grid grid-2 costs">
+        <div class="card">
+          <h3>What a recovery attempt costs</h3>
+          <ul class="ticks">
+            <li>A contact the customer will not welcome twice</li>
+            <li>Agent capacity that another opportunity needed</li>
+            <li>Merchant discount budget, once spent</li>
+            <li>Customer fatigue — the next attempt converts less</li>
+            <li>Regulatory exposure if timing or consent is wrong</li>
+          </ul>
+        </div>
+        <div class="card card-question">
+          <h3>So the real question is not <em>"how do we retry?"</em></h3>
+          <p class="ask">Is recovering <em>this</em> payment worth attempting <em>right now</em>?</p>
+          <p class="small">
+            Answering that needs something no per-request permission check can provide: a
+            view of every agent's demand on the same customer, the budget they share, and
+            what that contact costs the future.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================= WHY NOT JUST RETRY ====================== -->
+  <section class="band band-alt">
+    <div class="shell">
+      <p class="eyebrow">Why not just retry?</p>
+      <h2>Same failure. Different answer.</h2>
+
+      <div class="grid grid-2 compare">
+        <div class="card compare-naive">
+          <div class="compare-head"><span class="tag tag-none tag-plain">Naive</span></div>
+          <div class="flow flow-naive">
+            <div class="fl">Payment failed</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl fl-end">Retry</div>
+          </div>
+          <p class="small">
+            Every failure gets the same treatment. Contacts are spent on payments that
+            could never repay them, and the customers who <em>were</em> worth reaching
+            are reached too often to respond.
+          </p>
+        </div>
+
+        <div class="card compare-sampark">
+          <div class="compare-head"><span class="tag tag-live-sam tag-plain">SAMPARK</span></div>
+          <div class="flow">
+            <div class="fl">Payment failed</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl">Understand the failure</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl">Estimate recovery value</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl">Check policy &amp; consent</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl">Check contact &amp; budget limits</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl">Allocate the right agent</div>
+            <div class="fl-arrow" aria-hidden="true"></div>
+            <div class="fl fl-end">Recover only when worthwhile</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- The evidence, from the running system. -->
+      <div class="card evidence-pair">
+        <div class="ep-head">
+          <div>
+            <p class="eyebrow" style="margin:0">The same mechanism, two answers</p>
+            <h3 style="margin:6px 0 0">Real Razorpay Test Mode payments, decided by the shipped allocator</h3>
+          </div>
+          <span class="tag tag-live-sam">Live &middot; SAMPARK</span>
+        </div>
+
+        <div class="grid grid-2 ep-cases">
+          <div class="case case-deny">
+            <div class="case-top">
+              <span class="case-amt">&#8377;1,000</span>
+              <span class="case-verdict">DENIED</span>
+            </div>
+            <div class="case-body">
+              <div class="kv2"><span>Reason</span><b class="mono">allocation.negative_expected_net</b></div>
+              <div class="kv2"><span>Expected net</span><b class="bad">&minus;&#8377;267.74</b></div>
+              <div class="kv2"><span>Recovery</span><b>Not attempted</b></div>
+            </div>
+            <p class="case-note">
+              Chasing this one would cost more in future recoveries than it could return.
+              No contact is sent and no budget is spent.
+            </p>
+          </div>
+
+          <div class="case case-grant">
+            <div class="case-top">
+              <span class="case-amt">&#8377;4,000</span>
+              <span class="case-verdict">GRANTED</span>
+            </div>
+            <div class="case-body">
+              <div class="kv2"><span>Reason</span><b>Clears the economic bar</b></div>
+              <div class="kv2"><span>Expected net</span><b class="good">positive</b></div>
+              <div class="kv2"><span>Recovery</span><b>Executed &rarr; CONFIRMED</b></div>
+            </div>
+            <p class="case-note">
+              Worth the contact. A bounded intervention is issued, executed against the
+              channel, and settled — reversibly.
+            </p>
+          </div>
+        </div>
+
+        <div class="breakeven">
+          <div class="be-bar" aria-hidden="true">
+            <div class="be-fill"></div>
+            <div class="be-mark be-1000"><span>&#8377;1,000</span></div>
+            <div class="be-mark be-line"><span>break-even &asymp; &#8377;1,978</span></div>
+            <div class="be-mark be-4000"><span>&#8377;4,000</span></div>
+          </div>
+          <p class="small be-copy">
+            <b>SAMPARK is not picking the bigger payment.</b> It compares each opportunity's
+            expected <em>net</em> value against what spending this customer's one available
+            contact costs the future. On this data that cost is about <b>&#8377;541</b> per
+            contact, which puts break-even for a failed payment near <b>&#8377;1,978</b>.
+            A payment from a customer with several other open items scores differently
+            again — the amount alone never decides.
+            <br><br>
+            This threshold comes from constants frozen before any of these results were
+            seen. <b>It was not adjusted to make the demo look better.</b>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== WHERE SAMPARK SITS ====================== -->
+  <section class="band">
+    <div class="shell">
+      <p class="eyebrow">Where it fits</p>
+      <h2>Razorpay keeps the payments. SAMPARK adds the decision.</h2>
+
+      <div class="arch">
+        <div class="arch-col arch-rzp">
+          <div class="arch-label">RAZORPAY</div>
+          <div class="arch-card">
+            <ul class="ticks ticks-teal">
+              <li>Payment infrastructure &amp; checkout</li>
+              <li>Orders, payment links, payment status</li>
+              <li>The failure event and its error code</li>
+              <li>Webhooks</li>
+              <li>Payment execution primitives</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="arch-mid" aria-hidden="true">
+          <div class="arch-line"></div>
+          <div class="arch-pill">failed payment</div>
+          <div class="arch-line"></div>
+        </div>
+
+        <div class="arch-col arch-sam">
+          <div class="arch-label">SAMPARK</div>
+          <div class="arch-card">
+            <ul class="ticks ticks-brand">
+              <li>Revenue-at-risk detection &amp; normalisation</li>
+              <li>Cryptographic agent identity and capability scope</li>
+              <li>Policy enforcement — consent, quiet hours, contact caps, interlocks</li>
+              <li>Expected-value scoring and allocation across competing agents</li>
+              <li>Bounded, reversible intervention</li>
+              <li>Hash-chained audit log and a deterministic explanation</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <p class="note note-brand arch-note">
+        SAMPARK demonstrates a decision layer that Razorpay <b>could</b> integrate around
+        its existing payment infrastructure. It does not replace any of it, and this
+        project makes no claim about what Razorpay does or does not already run
+        internally.
+      </p>
+    </div>
+  </section>
+
+  <!-- ========================= AGENTS ========================= -->
+  <section class="band band-alt">
+    <div class="shell">
+      <p class="eyebrow">Agents</p>
+      <h2>Several agents want the same customer. Only one should get them.</h2>
+      <p class="lede section-lede">
+        A recovery agent is an automated worker with a narrow job — retry a failed
+        payment, rescue an abandoned cart, chase an overdue invoice. Each one can hold
+        valid consent, an approved scope, an in-policy discount and a registered template
+        and still be the wrong one to act, because <b>the cost of burning a customer falls
+        on whoever needs them next week</b>. Authorization answers one request at a time
+        and cannot see that.
+      </p>
+
+      <div class="grid grid-4">
+        <div class="card agent-card">
+          <div class="ac-n">1</div><h3>Identity</h3>
+          <p class="small">Every request is signed with the agent's own Ed25519 key and verified before anything else happens.</p>
+        </div>
+        <div class="card agent-card">
+          <div class="ac-n">2</div><h3>Scope</h3>
+          <p class="small">A declared capability — which channels, intents, risk sources and discount ceiling. Out of scope is refused without the allocator ever running.</p>
+        </div>
+        <div class="card agent-card">
+          <div class="ac-n">3</div><h3>Limits</h3>
+          <p class="small">Rate ceilings, contact caps, quiet hours and a shared merchant budget. Repeated protocol misuse accumulates strikes and revokes the key.</p>
+        </div>
+        <div class="card agent-card">
+          <div class="ac-n">4</div><h3>Allocation</h3>
+          <p class="small">Among the agents that <em>may</em> act, one is chosen on expected net value. The rest are deferred or declined, with a reason.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================== BENEFIT TO RAZORPAY ====================== -->
+  <section class="band">
+    <div class="shell">
+      <p class="eyebrow">Why it could matter to Razorpay</p>
+      <h2>Four things this layer adds.</h2>
+      <div class="grid grid-4">
+        <div class="card benefit">
+          <h3>Better recovery efficiency</h3>
+          <p class="small">Prioritise economically worthwhile interventions instead of treating every failed payment identically.</p>
+        </div>
+        <div class="card benefit">
+          <h3>Less unnecessary contact</h3>
+          <p class="small">Avoid repeatedly contacting customers where the expected recovery value is negative.</p>
+        </div>
+        <div class="card benefit">
+          <h3>Controlled agent automation</h3>
+          <p class="small">Third-party agents operate inside scopes, budgets, rate limits, quiet hours and revocation rules.</p>
+        </div>
+        <div class="card benefit">
+          <h3>Auditable decisions</h3>
+          <p class="small">Every meaningful decision is a hash-chained event, replayable and independently verifiable.</p>
+        </div>
+      </div>
+      <p class="tiny benefit-note">
+        These are properties of the decision layer as built and tested here. No revenue
+        improvement is claimed or guaranteed — see the evidence below.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================ EVIDENCE ============================ -->
+  <section class="band band-alt">
+    <div class="shell">
+      <p class="eyebrow">Evidence</p>
+      <h2>What the experiment actually found.</h2>
+      <p class="lede section-lede">
+        Five precommitted seeds, one synthetic merchant month, four identical agents in
+        both arms. These are the committed results, including the ones that do not
+        flatter us.
+      </p>
+
+      <div class="grid grid-4 ev-grid">
+        <div class="card stat ev">
+          <span class="n" data-count="-48.5" data-suffix=" %">&minus;48.5 %</span>
+          <span class="k">fewer contacts</span>
+        </div>
+        <div class="card stat ev ev-bad">
+          <span class="n bad" data-count="-8.2" data-suffix=" %">&minus;8.2 %</span>
+          <span class="k">lower total revenue recovered</span>
+        </div>
+        <div class="card stat ev ev-good">
+          <span class="n good" data-count="1.687" data-suffix="&times;" data-dp="3">1.687&times;</span>
+          <span class="k">revenue per contact</span>
+        </div>
+        <div class="card stat ev">
+          <span class="n" data-count="0" data-suffix=".00 %" data-dp="0">0.00 %</span>
+          <span class="k">contribution from the ML models</span>
+        </div>
+      </div>
+
+      <div class="grid grid-2 ev-copy">
+        <div class="note note-warn">
+          <b>SAMPARK recovered less total money, and we are not hiding it.</b>
+          It recovered that money with roughly half the contacts, which is the point:
+          the system optimises recovery <em>efficiency</em>, not retry volume. If your
+          objective is to maximise gross recovered rupees regardless of what it costs the
+          customer relationship, this is the wrong layer.
+        </div>
+        <div class="note note-warn">
+          <b>The ML models did not improve on the heuristic.</b>
+          The uplift model is honestly unavailable on this data — there is no untreated
+          control population to learn from — so its contribution is exactly zero.
+          SAMPARK therefore rests on no unsupported ML claim. The model seam exists,
+          is tested, and degrades to the frozen heuristic with a logged event.
+        </div>
+      </div>
+
+      <div class="card ev-more">
+        <div class="grid grid-2">
+          <div>
+            <h3>A sensitivity sweep that argues against us</h3>
+            <p class="small">
+              A 50-point sweep over the two ground-truth response coefficients — the grid,
+              the metric and six predictions committed to git <em>before</em> the sweep ran.
+              All six passed. It also found that <b>selection and allocation, not the
+              cross-agent fatigue term, explain most of the advantage</b>: switch fatigue
+              off entirely and about 73&nbsp;% of the win survives. The specification called
+              fatigue "the whole thesis expressed as arithmetic". The measurement disagrees,
+              and that is reported here rather than left for a reviewer to find.
+            </p>
+          </div>
+          <div>
+            <h3>Compliance is the part that does not move</h3>
+            <p class="small">
+              Across every committed run: <b>zero</b> quiet-hour violations, <b>zero</b>
+              contact-cap breaches, <b>zero</b> interlock violations, and <b>zero</b> scope
+              violations by the well-behaved agents. That last figure is the control — it is
+              <em>expected</em> to read zero, and it does while every other number moves,
+              which is the cleanest available evidence that authorization was never the
+              binding constraint.
+            </p>
+          </div>
+        </div>
+        <p class="tiny">
+          Source: <code>results/phase9_abh_table.json</code>,
+          <code>results/phase9_sensitivity.json</code>, <code>results/gate_headline.json</code>
+          — committed evidence files, reproducible from the README.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================== WHAT IS REAL ========================== -->
+  <section class="band">
+    <div class="shell">
+      <p class="eyebrow">Honesty</p>
+      <h2>What is real, what is simulated, and what is not.</h2>
+      <p class="lede section-lede">
+        These four categories are used consistently across every page of this product.
+        Nothing is ever shown in a way that blurs them.
+      </p>
+
+      <div class="scroll-x">
+      <table class="truth">
+        <thead>
+          <tr><th>Category</th><th>What it means</th><th>Covers</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-live-rzp">Live &middot; Razorpay MCP</span></td>
+            <td>Really performed against Razorpay's test environment, through the Razorpay MCP Server.</td>
+            <td>Payment-link creation; payment-link and payment reads; the test-mode checkout you can open yourself.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-live-sam">Live &middot; SAMPARK</span></td>
+            <td>Really executed here, now, by the shipped code, and written to a hash-chained audit log.</td>
+            <td>Risk detection, scope checks, policy filtering, scoring, allocation, grant issuance, execution, audit verification.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-sim">Simulated</span></td>
+            <td>SAMPARK's own seeded world. No Razorpay involvement whatsoever.</td>
+            <td>The System Simulation page: synthetic customers and amounts, injected provider timeouts, the rogue agent, the model kill.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-arch">Architectural capability</span></td>
+            <td>The mechanism exists and is tested, but was not exercised end to end.</td>
+            <td>Razorpay webhook delivery over the public internet — a local demo has no public URL.</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-none">Not demonstrated</span></td>
+            <td>Not shown here at all, and claimed nowhere.</td>
+            <td>Live S2S payment initiation; live LLM policy compilation; any production deployment.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+
+      <div class="grid grid-2 limits">
+        <div class="card">
+          <h3>Honest limitations</h3>
+          <ul class="ticks ticks-amber">
+            <li><b>The data is synthetic.</b> 5,000 generated people, ~20,000 risk items, one simulated month. Reproducible and falsifiable — not evidence about the real world.</li>
+            <li><b>The break-even figure is a property of that model</b>, not of any real merchant. The mechanism transfers; the number does not.</li>
+            <li><b>Channels are mocked on purpose.</b> You cannot lawfully message real numbers on synthetic consent, so the payload that would have been sent is logged instead.</li>
+            <li><b>No load test, no p99 latency measurement.</b> Reported as not measured rather than estimated.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>What is genuinely demonstrated</h3>
+          <ul class="ticks ticks-green">
+            <li>A real Razorpay Test Mode integration, via the Razorpay MCP Server, with provenance that cannot be fabricated.</li>
+            <li>A complete decision path from a real failed payment to a bounded, recorded outcome.</li>
+            <li>A hash-chained audit log you can verify from the UI in one click.</li>
+            <li>Deterministic replay of the failure and recovery mechanisms at scale.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================== CTA ============================== -->
+  <section class="band band-cta">
+    <div class="shell cta-inner">
+      <div>
+        <h2 style="margin-bottom:8px">See it decide.</h2>
+        <p class="lede" style="margin:0">
+          A real ₹1,000 Razorpay test payment, declined on the arithmetic — and a ₹4,000
+          one funded by the same mechanism.
+        </p>
+      </div>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="/live">Run Razorpay Test &rarr;</a>
+        <a class="btn" href="/system">System Simulation</a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="shell foot-inner">
+    <span class="tiny">SAMPARK &middot; a proposed recovery decision layer &middot; Razorpay Test Mode only &middot; no real money moves</span>
+    <span class="tiny">Overview &middot; <a href="/live">Live Razorpay Test</a> &middot; <a href="/system">System Simulation</a></span>
+  </div>
+</footer>
+
+<script src="/static/overview.js"></script>
+</body>
+</html>

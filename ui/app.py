@@ -62,12 +62,12 @@ def create_app(config: PostgresConfig | None = None) -> FastAPI:
     app = FastAPI(
         title="SAMPARK - revenue recovery control center",
         description=(
-            "Two surfaces over one system. `/` is the Razorpay Test Mode product demo: "
-            "one real test-mode payment failure through the mediation layer. `/system` is "
-            "the Phase 8 synthetic replay: contention, failure and recovery at scale. Both "
-            "render the hash-chained audit log and nothing else (spec §12.1). Local "
-            "demonstration console: no authentication, bound to localhost, and structurally "
-            "unable to write outside its throwaway schema."
+            "Three surfaces over one system. `/` is the product overview. `/live` is the "
+            "Razorpay Test Mode demo: one real test-mode payment failure through the "
+            "mediation layer. `/system` is the Phase 8 synthetic replay: contention, failure "
+            "and recovery at scale. The two trace surfaces render the hash-chained audit log "
+            "and nothing else (spec §12.1). Local demonstration console: no authentication, "
+            "bound to localhost, and structurally unable to write outside its throwaway schema."
         ),
         version="9.1",
         lifespan=lifespan,
@@ -87,14 +87,24 @@ def create_app(config: PostgresConfig | None = None) -> FastAPI:
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-        # `/` is the PRODUCT surface: the Razorpay Test Mode flow, plus the
-        # link across to the system demo. `/system` is Phase 8's screen,
-        # served from the unchanged `index.html` — the file
+        # THREE surfaces over one system, each answering a different question:
+        #
+        #   /        Overview   — why should Razorpay care?
+        #   /live    Live test  — does this really connect to Razorpay?
+        #   /system  Simulation — does the underlying engineering work?
+        #
+        # `/system` still serves Phase 8's `index.html`, which
         # `tests/test_ui_renders_only_audit_events.py` reads and asserts
-        # against, so moving its ROUTE changes no invariant it enforces.
+        # against by name. The only change ever made to that file is the shared
+        # navigation strip; `app.js`, `styles.css` and `ui/sse.py` are
+        # byte-identical to the Phase 8 commit.
         @app.get("/", include_in_schema=False)
-        def product() -> FileResponse:
-            return FileResponse(str(STATIC_DIR / "product.html"))
+        def overview() -> FileResponse:
+            return FileResponse(str(STATIC_DIR / "overview.html"))
+
+        @app.get("/live", include_in_schema=False)
+        def live_razorpay() -> FileResponse:
+            return FileResponse(str(STATIC_DIR / "live.html"))
 
         @app.get("/system", include_in_schema=False)
         def system_trace() -> FileResponse:

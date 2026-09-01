@@ -190,10 +190,18 @@ python -m sim.abh_table         # → rebuilds the A/B/H table from committed ev
 uvicorn ui.app:app --host 127.0.0.1 --port 8000
 ```
 
-| | |
-|---|---|
-| <http://127.0.0.1:8000> | **Product demo.** One real Razorpay **Test Mode** payment failure through the decision layer. Needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`; add `RAZORPAY_MCP_TOKEN` to route it through the Razorpay MCP Server instead of the REST test API. |
-| <http://127.0.0.1:8000/system> | **System demo.** The Phase 8 deterministic ~40-second replay: contention between four authorized agents, a provider timeout and rollback, a rogue agent struck and revoked, the model killed mid-run, compliance holding at zero. **Synthetic** — its data comes from the committed seeded generator, not from Razorpay. |
+Three surfaces, one system — each answering a different question:
+
+| Route | Surface | Answers |
+|---|---|---|
+| <http://127.0.0.1:8000> | **Overview** | *Why should Razorpay care?* The problem, why retrying everything is not enough, where SAMPARK sits, and the evidence — including the results that do not flatter us. Renders no system state at all. |
+| <http://127.0.0.1:8000/live> | **Live Razorpay Test** | *Does this really connect to Razorpay?* One real ₹1,000 Test Mode payment failure through the decision layer, beside a ₹4,000 contrast. Needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`; add `RAZORPAY_MCP_TOKEN` to route it through the Razorpay MCP Server instead of the REST test API. |
+| <http://127.0.0.1:8000/system> | **System Simulation** | *Does the underlying engineering work?* The Phase 8 deterministic ~40-second replay: contention between four authorized agents, a provider timeout and rollback, a rogue agent struck and revoked, the model killed mid-run, compliance holding at zero. **Synthetic** — its data comes from the committed seeded generator, not from Razorpay. |
+
+Every claim on those pages carries one of four labels, used identically
+everywhere: **Live · Razorpay MCP**, **Live · SAMPARK**, **Simulated**, and
+**Architectural capability** (plus **Not demonstrated**). They are never
+blurred, and `tests/ui/test_product_surface.py` enforces that statically.
 
 Check the integration without a browser:
 

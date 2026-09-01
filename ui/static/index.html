@@ -4,9 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SAMPARK — live trace</title>
+<link rel="stylesheet" href="/static/navbar.css">
 <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
+
+<nav class="sk-nav" aria-label="Primary">
+  <div class="sk-nav-brand">
+    <span class="sk-name">SAMPARK</span>
+    <span class="sk-sub">Recovery Intelligence for Razorpay</span>
+  </div>
+  <div class="sk-nav-links">
+    <a href="/">Overview</a>
+    <a href="/live">Live Razorpay Test</a>
+    <a href="/system" aria-current="page">System Simulation</a>
+  </div>
+  <div class="sk-nav-status">
+    <span class="sk-badge sk-badge-test">RAZORPAY TEST MODE</span>
+  </div>
+</nav>
+
+<div class="sk-strip">
+  <span class="sk-strip-tag">Synthetic simulation</span>
+  <span><b>No Razorpay data.</b> A deterministic replay of SAMPARK's own seeded world &mdash;
+    this is where the failure and recovery mechanisms are demonstrated at scale.</span>
+  <span class="sk-strip-steps">
+    <span>1 &middot; Run replay</span>
+    <span>2 &middot; watch the denials</span>
+    <span>3 &middot; fire a chaos control</span>
+    <span>4 &middot; Verify chain</span>
+  </span>
+</div>
 
 <header id="topbar">
   <div class="brand">
