@@ -79,7 +79,46 @@ def _all_sample_events() -> list:
         emit.event_for_agent_registered(agent, ISSUED_AT),
         emit.event_for_agent_struck(agent.model_copy(update={"strike_count": 1}), "scope.channel_not_allowed", ISSUED_AT, request),
         emit.event_for_agent_revoked(agent.model_copy(update={"strike_count": 3, "state": AgentState.REVOKED}), ISSUED_AT),
+        # Razorpay product integration. Included here so the privacy rule is
+        # exercised over the FULL vocabulary rather than the pre-integration
+        # one — this is the only event type built from an external payload
+        # that really does carry a customer's phone and email, so it is the
+        # one with the most to leak. It carries neither: identity reaches it
+        # only as the hash-derived customer_id.
+        emit.event_for_payment_risk_detected(_razorpay_opportunity()),
     ]
+
+
+def _razorpay_opportunity():
+    from sampark.integrations.normalize import normalize_payment
+    from sampark.integrations.provenance import McpCallReceipt, Provenance
+
+    return normalize_payment(
+        {
+            "id": "pay_PRIV00000001", "entity": "payment", "amount": 100_000, "currency": "INR",
+            "status": "failed", "order_id": "order_PRIV01", "method": "card",
+            "email": "priya.sharma@example.com", "contact": "+91 98765 43210",
+            "error_code": "GATEWAY_ERROR", "error_reason": "issuer_down",
+            "error_source": "bank", "error_step": "payment_authorization",
+            "created_at": 1788000000,
+        },
+        Provenance.from_mcp(
+            McpCallReceipt("fetch_payment", "mcp.razorpay.com", "razorpay-mcp-server", "1.0.0"),
+            observed_at=ISSUED_AT, reference="pay_PRIV00000001",
+        ),
+        payment_link_id="plink_PRIV1",
+    )
+
+
+def test_no_raw_contact_detail_from_a_razorpay_payment_reaches_a_payload():
+    """T-21 extended to the one event type built from an EXTERNAL payload.
+    The source payment carries a real email and phone; the audit event must
+    carry neither, in any form."""
+    event = emit.event_for_payment_risk_detected(_razorpay_opportunity())
+    blob = repr(event.payload)
+    for secret in ("priya.sharma@example.com", "9876543210", "98765 43210", "+91"):
+        assert secret not in blob, f"raw contact detail leaked into the payload: {secret!r}"
+    assert event.payload["customer_id"].startswith("cust_")
 
 
 def _walk_payload_strings(value, path=""):

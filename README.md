@@ -1,9 +1,81 @@
 # SAMPARK
 
-**A mediation layer for revenue-recovery agents.**
+**A bounded recovery decision layer for failed payments.**
+A proposed integration alongside Razorpay's payment infrastructure, running
+against **Razorpay Test Mode**. No real money moves. SAMPARK is not deployed
+inside Razorpay and Razorpay does not use it.
 
 > **Authorization decides whether an agent *may* act.
 > Authorization alone must not decide which of several equally-authorized agents *should* act.**
+
+---
+
+## In one screen
+
+**A Razorpay payment fails. SAMPARK detects the revenue at risk, decides
+whether recovery is worthwhile *and permitted*, selects a bounded intervention,
+and records exactly what happened.**
+
+```
+Razorpay Test Mode          SAMPARK
+──────────────────          ───────
+₹1,000 payment link  ─┐
+customer pays with    │
+a failing test card   │
+       ↓              │
+  payment.failed ─────┴──►  normalise → one customer, one risk item
+  pay_xxx                        ↓
+  error_code                agent raises a SIGNED request  (Ed25519)
+  contact, email                 ↓
+                            registry · capability scope
+                                 ↓
+                            hard policy · consent, quiet hours, contact caps
+                                 ↓
+                            score & allocate · expected NET value
+                                 ↓
+                            reserve (SERIALIZABLE) → execute → confirm | roll back
+                                 ↓
+                            hash-chained audit log + a deterministic explanation
+```
+
+**What Razorpay provides:** payment infrastructure, orders, payment links,
+payment status, the failure event and its error code, webhooks, payment
+execution primitives.
+
+**What SAMPARK adds:** revenue-at-risk detection, cryptographic agent identity
+and capability scope, hard policy enforcement, expected-value scoring and
+allocation across competing agents, bounded intervention, auditability, and
+explanation.
+
+SAMPARK does not replace Razorpay's payment infrastructure. It adds a decision
+and recovery layer around failed and recoverable payments.
+
+### Why retrying isn't enough — demonstrated, not asserted
+
+Run the demo and the ₹1,000 payment is **declined**, with
+`allocation.negative_expected_net`.
+
+That is not a bug and nothing was tuned to produce it. With the frozen Phase 4
+constants, one contact costs a customer's *future* about **₹541** in expected
+recovery — every later attempt on them moves one step down the decay curve — so
+a `failed_payment` only clears break-even above roughly **₹1,978**. SAMPARK
+declines to spend that customer's single contact slot on a recovery worth less
+than what spending it destroys.
+
+**That is the answer to "why can't Razorpay just retry everything?", and it is
+arithmetic from committed evidence rather than a rule written for a demo.**
+Recovery capacity is a constrained, shared, depletable resource: the customer's
+attention. Deciding *which* failures deserve intervention, *which* intervention,
+and *which agent* may execute it is the actual problem.
+
+The demo also creates a second, clearly-labelled payment above that threshold,
+so the grant → execute → confirm path is visible too. Prioritisation is **not**
+"the bigger payment wins": the threshold is expected *net* value, and the
+fatigue term depends on what else that customer already has open.
+
+Full detail, including exactly which Razorpay MCP operations were used and what
+the webhook does and does not verify:
+**[RAZORPAY_INTEGRATION.md](RAZORPAY_INTEGRATION.md)**.
 
 ---
 
@@ -112,11 +184,23 @@ python -m sampark.audit.verify  # → VALID: True   (560 events, chain intact)
 python -m sim.abh_table         # → rebuilds the A/B/H table from committed evidence
 ```
 
-**Watch the system make decisions live:**
+**Watch the system make decisions live** — two surfaces, one system:
 
 ```bash
 uvicorn ui.app:app --host 127.0.0.1 --port 8000
-# open http://127.0.0.1:8000 and press "Run replay"
+```
+
+| | |
+|---|---|
+| <http://127.0.0.1:8000> | **Product demo.** One real Razorpay **Test Mode** payment failure through the decision layer. Needs `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`; add `RAZORPAY_MCP_TOKEN` to route it through the Razorpay MCP Server instead of the REST test API. |
+| <http://127.0.0.1:8000/system> | **System demo.** The Phase 8 deterministic ~40-second replay: contention between four authorized agents, a provider timeout and rollback, a rogue agent struck and revoked, the model killed mid-run, compliance holding at zero. **Synthetic** — its data comes from the committed seeded generator, not from Razorpay. |
+
+Check the integration without a browser:
+
+```bash
+python scripts/verify_razorpay_product_flow.py --probe        # read-only
+python scripts/verify_razorpay_product_flow.py --create-link  # one ₹1,000 test link
+python scripts/verify_razorpay_product_flow.py --decide plink_XXXX
 ```
 
 One hands-off ~40-second replay produces all three failure modes with no input:

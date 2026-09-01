@@ -9,6 +9,8 @@ there is no second place where a decision's shape is declared.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from sampark.demo.scenario import DEFAULT_SEED
@@ -33,3 +35,29 @@ class ChaosFireRequest(BaseModel):
     # ChaosInapplicableError (409) rather than guessing at a default that
     # would silently do the wrong thing.
     target: str | None = None
+
+
+class ProviderFailureRequest(BaseModel):
+    """Arm the mock channel provider for the Razorpay product flow.
+
+    `mode` is a `sampark.demo.provider.ProviderFailureMode` value. Validated
+    by the session (which owns the enum) rather than restated as a second
+    Literal here — one vocabulary, one owner."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str | None = None
+
+
+class PaymentLinkRequest(BaseModel):
+    """Create one Razorpay Test Mode payment link.
+
+    `role` is presentation only and never reaches Razorpay: "headline" is the
+    demo's 1,000 INR subject, "contrast" is the second, above-break-even
+    payment that exists so the grant path is demonstrable. `amount_inr`
+    overrides the role's default amount; the gateway owns both defaults."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["headline", "contrast"] = "headline"
+    amount_inr: int | None = Field(default=None, ge=1)

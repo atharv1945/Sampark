@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SAMPARK — Revenue Recovery Control Center</title>
+<link rel="stylesheet" href="/static/product.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="logo">SAMPARK</span>
+    <span class="tagline">Revenue Recovery Intelligence &middot; a decision layer for failed payments</span>
+  </div>
+  <div class="badges">
+    <span class="badge badge-test" id="badge-mode">RAZORPAY TEST MODE &mdash; no real money moves</span>
+    <span class="badge" id="badge-transport">transport &mdash;</span>
+    <span class="badge" id="badge-session">no session</span>
+  </div>
+  <nav class="navlinks">
+    <a class="navlink" href="/system">System demo &rarr;</a>
+  </nav>
+</header>
+
+<!-- HONESTY BANNER. Stated on screen, not only in the README. -->
+<div id="integrity-banner">
+  <b>What this is.</b> A <b>proposed</b> Razorpay-compatible integration, running against
+  <b>Razorpay Test Mode</b>. SAMPARK is not deployed inside Razorpay, Razorpay does not use
+  SAMPARK, and no real money moves here.
+  <b>What is real:</b> the payment link, the payment, the failure and the failure code all come
+  from Razorpay's test environment. Every decision below is made by SAMPARK's committed
+  mediation code and written to a hash-chained audit log.
+  <b>The trace region renders that audit log and nothing else</b> &mdash;
+  anything marked <span class="chip chip-control">integration control</span> is operator state,
+  not system truth, and is marked wherever it appears.
+</div>
+
+<main>
+
+  <!-- ============ LEFT: the story ============ -->
+  <section id="col-story">
+
+    <div id="hero" class="card hero-idle">
+      <div class="hero-eyebrow">
+        <span id="hero-source">Razorpay Test Mode</span>
+        <span class="dot">&middot;</span>
+        <span id="hero-payment">no payment yet</span>
+      </div>
+      <div class="hero-amount"><span id="hero-amount" class="idle">awaiting a failed payment</span></div>
+      <div class="hero-label">REVENUE AT RISK</div>
+
+      <div class="hero-grid">
+        <div>
+          <h4>Why it failed</h4>
+          <div class="big" id="hero-rootcause">&mdash;</div>
+          <div class="small mono" id="hero-failcode">waiting for a failed payment</div>
+        </div>
+        <div>
+          <h4>SAMPARK decision</h4>
+          <div class="big" id="hero-decision">&mdash;</div>
+          <div class="small mono" id="hero-reason">the allocator has not run</div>
+        </div>
+        <div>
+          <h4>Bounded intervention</h4>
+          <div class="big" id="hero-intervention">&mdash;</div>
+          <div class="small mono" id="hero-intervention-detail">no grant issued</div>
+        </div>
+      </div>
+      <div class="hero-foot">
+        <span class="chip chip-audit">audit-derived</span>
+        every field above is read from a
+        <code>payment.risk_detected</code>, <code>decision.*</code> or <code>grant.*</code>
+        row in the chain. Before those events exist it says so, rather than guessing.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Pipeline <span class="sub">a stage lights only when its audit event arrives</span></h2>
+      <ol id="pipeline">
+        <li data-node="detect"  ><span class="n">1</span> payment failed &rarr; revenue at risk</li>
+        <li data-node="request" ><span class="n">2</span> agent raises a signed request</li>
+        <li data-node="scope"   ><span class="n">3</span> registry &middot; capability scope</li>
+        <li data-node="policy"  ><span class="n">4</span> hard policy &middot; consent, quiet hours, caps</li>
+        <li data-node="allocate"><span class="n">5</span> score &amp; allocate</li>
+        <li data-node="reserve" ><span class="n">6</span> reserve (SERIALIZABLE)</li>
+        <li data-node="execute" ><span class="n">7</span> execute &middot; channel provider</li>
+        <li data-node="settle"  ><span class="n">8</span> confirm | rollback</li>
+      </ol>
+      <div class="legend">
+        <span class="sw sw-granted"></span>granted
+        <span class="sw sw-scope"></span>denied &middot; scope
+        <span class="sw sw-policy"></span>denied/deferred &middot; policy or budget
+        <span class="sw sw-rolled"></span>rolled back
+        <span class="sw sw-pending"></span>reached &middot; no verdict
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Which opportunity deserves intervention?
+        <span class="sub">every column read off the audit events</span></h2>
+      <div id="comparison" class="muted small">No opportunities yet.</div>
+      <p class="small break-even">
+        <b>SAMPARK is not choosing the bigger payment.</b> It compares each opportunity's
+        <b>expected net value</b> against the cost of spending the one contact this customer can
+        receive in this window:
+        <code>expected_net = p&#770; &times; amount &minus; channel cost &minus; expected incentive &minus; fatigue cost</code>.
+        The fatigue term prices what a contact <i>costs the future</i> &mdash; every later recovery
+        attempt on that customer moves one step down the decay curve. With the frozen Phase 4
+        constants that cost is <b>&#8377;541.20</b> per contact for a customer with nothing else
+        open, so a <code>failed_payment</code> only clears the bar above about <b>&#8377;1,978</b>.
+        A <b>&#8377;1,000</b> failed payment is <b>below</b> it and is declined with
+        <code>allocation.negative_expected_net</code>. That is the answer to
+        &ldquo;why not just retry everything?&rdquo; &mdash; and it is arithmetic from committed,
+        frozen constants, not a rule written for this demo.
+        A low-value payment from a customer with several other open items scores differently
+        again; the amount alone never decides.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Decision trace <span class="sub">click a row to see the raw event and its explanation</span>
+        <span id="event-count" class="count">0</span></h2>
+      <div id="feed" class="feed-empty-hint">Nothing yet. Start a session on the right.</div>
+    </div>
+
+    <div class="card two-up">
+      <div>
+        <h2>Razorpay provides</h2>
+        <ul class="boundary boundary-rzp">
+          <li>payment infrastructure and checkout</li>
+          <li>orders, payment links, payment status</li>
+          <li>the failure event and its error code</li>
+          <li>webhooks</li>
+          <li>payment execution primitives</li>
+        </ul>
+      </div>
+      <div>
+        <h2>SAMPARK adds</h2>
+        <ul class="boundary boundary-sam">
+          <li>revenue-at-risk detection and normalisation</li>
+          <li>cryptographic agent identity and capability scope</li>
+          <li>hard policy enforcement (consent, quiet hours, contact caps, interlocks)</li>
+          <li>expected-value scoring and allocation across competing agents</li>
+          <li>bounded intervention, budgeted and reversible</li>
+          <li>a hash-chained audit log and a deterministic explanation</li>
+        </ul>
+      </div>
+      <p class="boundary-note">
+        SAMPARK does not replace Razorpay's payment infrastructure. It adds a decision and
+        recovery layer around failed and recoverable payments.
+      </p>
+    </div>
+
+  </section>
+
+  <!-- ============ RIGHT: controls + record ============ -->
+  <section id="col-control">
+
+    <div class="card">
+      <h2>Guided demo <span class="chip chip-control">integration control</span></h2>
+      <ol id="steps">
+        <li data-step="session">
+          <div class="step-head"><b>1. Open a session</b>
+            <button id="btn-session" class="primary">Start</button></div>
+          <div class="step-note">Creates a throwaway PostgreSQL schema and registers
+            <code>payment_retry_agent</code>. The protected audit chain is never touched.</div>
+          <div class="step-out" id="out-session"></div>
+        </li>
+        <li data-step="link">
+          <div class="step-head"><b>2. Create the &#8377;1,000 test payment</b>
+            <button id="btn-link" class="primary">Create</button></div>
+          <div class="step-note">Razorpay Test Mode payment link. SMS and email notifications are
+            switched off &mdash; this demo never contacts a real person.</div>
+          <div class="step-out" id="out-link"></div>
+        </li>
+        <li data-step="contrast">
+          <div class="step-head"><b>3. Create the contrast payment</b>
+            <input id="contrast-amount" type="number" min="1" step="1" value="4000"
+                   aria-label="contrast amount in rupees">
+            <button id="btn-contrast">Create</button></div>
+          <div class="step-note">A second real test payment, <b>above</b> the allocator's
+            break-even. Optional, but it is what makes the comparison visible: SAMPARK declines
+            one of these and funds the other, from the same kind of failure signal.</div>
+          <div class="step-out" id="out-contrast"></div>
+        </li>
+        <li data-step="fail">
+          <div class="step-head"><b>4. Make the payments fail</b>
+            <button id="btn-refresh">Check status</button></div>
+          <div class="step-note">Open each link and pay with a Razorpay <b>test</b> card that
+            fails. Nothing here simulates the failure &mdash; Razorpay produces it, and SAMPARK
+            reads the real error code back.
+            <a href="https://razorpay.com/docs/payments/payments/test-card-details/"
+               target="_blank" rel="noopener noreferrer">Razorpay test card reference &rarr;</a></div>
+          <div class="step-out" id="out-refresh"></div>
+        </li>
+        <li data-step="ingest">
+          <div class="step-head"><b>5. Let SAMPARK decide</b>
+            <button id="btn-ingest" class="primary">Detect &amp; decide</button></div>
+          <div class="step-note">Reads each failed payment back from Razorpay, normalises it into a
+            risk item, and runs the unmodified mediation path: identity &rarr; scope &rarr; hard
+            policy &rarr; score &rarr; allocate &rarr; reserve &rarr; execute.</div>
+          <div class="step-out" id="out-ingest"></div>
+        </li>
+        <li data-step="verify">
+          <div class="step-head"><b>6. Prove it</b>
+            <button id="btn-verify">Verify chain</button>
+            <button id="btn-reset">Reset</button></div>
+          <div class="step-note">Recomputes every hash and checks the linkage.</div>
+          <div class="step-out" id="out-verify"></div>
+        </li>
+      </ol>
+      <div class="failure-controls">
+        <span>Failure injection:</span>
+        <button id="btn-provider-fail">Force provider timeout</button>
+        <span class="step-note">Arms the mock channel so the next send fails. The grant rolls back,
+          the budget and contact slot are released, and no double-send occurs.</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Integration <span class="chip chip-control">integration control</span></h2>
+      <div id="integration" class="kv">
+        <div><span>Provider</span><b>Razorpay</b></div>
+        <div><span>Environment</span><b class="ok">Test Mode</b></div>
+        <div><span>Transport</span><b id="int-transport">&mdash;</b></div>
+        <div><span>Operation</span><b id="int-operation">&mdash;</b></div>
+        <div><span>Amounts</span><b id="int-amount">&mdash;</b></div>
+        <div class="wide"><span>Links</span><b id="int-reference" class="mono">&mdash;</b></div>
+      </div>
+      <div id="int-fallback" class="note hidden"></div>
+      <p class="small">
+        The transport label is produced by the code path that actually ran. An MCP label
+        cannot be shown unless a Razorpay MCP <code>tools/call</code> really returned
+        &mdash; the receipt that mints it is constructed in exactly one place in the
+        repository, and a test asserts that.
+      </p>
+      <div id="mcp-capability" class="note"></div>
+    </div>
+
+    <div class="card">
+      <h2>Raw audit event <span class="sub">exactly what was written to the chain</span></h2>
+      <pre id="raw">Select a row in the decision trace.
+
+Nothing on this page is synthesised: each field below is a column value
+from a row that sampark.audit.chain.append wrote. `hash` is recomputed
+from the event, never read from a column — there is no hash column,
+deliberately, because a stored hash can be tampered to agree with a
+tampered payload and a recomputed one cannot.</pre>
+      <h2>Explanation <span class="sub">from sampark.audit.explain &mdash; generated from the log, no LLM</span></h2>
+      <div id="explanation" class="muted">Click an event carrying a request_id.</div>
+      <pre id="explain-events" class="small"></pre>
+    </div>
+
+    <div class="card">
+      <h2>What the evidence actually says</h2>
+      <table class="results">
+        <tr><td>Contacts sent</td><td class="num">&minus;48.5&nbsp;%</td></tr>
+        <tr><td><b>Total &#8377; recovered</b></td><td class="num bad">&minus;8.2&nbsp;%</td></tr>
+        <tr><td>&#8377; recovered per contact</td><td class="num good">+68.7&nbsp;%</td></tr>
+        <tr><td>Compliance violations</td><td class="num good">0</td></tr>
+        <tr><td>ML model contribution</td><td class="num">0.00&nbsp;%</td></tr>
+      </table>
+      <p class="small">
+        <b>SAMPARK recovered less total money in our synthetic experiment, and we are not hiding
+        that.</b> It recovered it with roughly half the contacts. The sensitivity sweep also found
+        that <b>selection and allocation, not the fatigue term, explain most of the advantage</b>
+        &mdash; switching cross-agent fatigue off entirely still leaves ~73&nbsp;% of it. The ML
+        seam exists but the uplift model is honestly unavailable on this data, so its contribution
+        is exactly zero. Source: <code>results/phase9_abh_table.json</code>,
+        <code>results/phase9_sensitivity.json</code> &mdash; committed evidence, <b>not</b>
+        audit-derived and not produced by this page.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Then see it at scale</h2>
+      <p class="small">One payment shows the decision. It cannot show contention, which is the
+        actual problem: four authorized agents wanting the same person in the same window.
+        The system demo replays that deterministically &mdash; provider timeout and rollback,
+        a rogue agent struck and revoked, the model killed mid-run, compliance holding at zero.</p>
+      <p class="small"><b>That replay is a synthetic simulation.</b> Its customers, amounts and
+        outcomes come from SAMPARK's committed seeded generator, not from Razorpay.</p>
+      <a class="bigbutton" href="/system">Open the SAMPARK synthetic recovery simulation &rarr;</a>
+    </div>
+
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<script src="/static/product.js"></script>
+</body>
+</html>

@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from sampark.attribution.credit import Credit
+    from sampark.integrations.normalize import RecoveryOpportunity
 
 from sampark.allocator.outcomes import AllocationOutcome, OutcomeKind
 from sampark.audit.canonical import iso_utc_micros
@@ -55,6 +56,7 @@ from sampark.audit.event_types import (
     GRANT_ROLLED_BACK,
     HOLDOUT_ASSIGNED,
     MODEL_DEGRADED,
+    PAYMENT_RISK_DETECTED,
     RECOVERY_CREDITED,
     REQUEST_DENIED_ON_SCOPE,
     REQUEST_RECEIVED,
@@ -91,6 +93,13 @@ EXPIRY_REASON = "ttl_expired"
 # mid-run" identically — degrade, log, keep issuing compliant grants.
 MODEL_DEGRADED_ARTIFACT_UNAVAILABLE = "model.artifact_unavailable"
 MODEL_DEGRADED_KILLED_BY_OPERATOR = "model.killed_by_operator"
+
+# Razorpay product integration. A fixed literal describing WHY this module is
+# being called, exactly like ROLLBACK_REASON / EXPIRY_REASON above: the
+# adapter only ever ingests a payment whose Razorpay status is `failed`
+# (`sampark.integrations.normalize.normalize_payment` refuses every other
+# status), so there is one reason and it is not inferred here.
+PAYMENT_FAILED_REASON = "razorpay.payment_failed"
 
 
 def _round_paise(value: float) -> int:
@@ -419,6 +428,81 @@ def event_for_model_degraded(
             "scorer_after": scorer_after,
         },
     )
+
+
+# --- Razorpay product integration (spec §8.2 normaliser) --------------------
+
+
+def event_for_payment_risk_detected(
+    opportunity: "RecoveryOpportunity", occurred_at: datetime | None = None
+) -> AuditEvent:
+    """A Razorpay (test-mode) payment event became a RiskItem in the at-risk
+    ledger — spec §8.2's normaliser step, recorded.
+
+    This is the ONE event the Razorpay integration adds. Everything after it
+    is an existing type emitted by the unmodified Phase 3/4/5 path, because a
+    normalised opportunity IS a `RiskItem` and nothing downstream knows or
+    cares where it came from. Its job is to put the PROVENANCE in the chain,
+    so the product screen's "Razorpay Test Mode / via MCP" claim is
+    corroborated by the audit log rather than asserted beside it.
+
+    COPY-ONLY, like every other function here: `root_cause` was already
+    resolved by `sampark.rootcause.classify` (a YAML lookup — CLAUDE.md §7),
+    `customer_id` by `sampark.identity.resolution`, and `transport` by
+    whichever transport module actually minted the receipt
+    (`sampark.integrations.provenance`). This module recomputes none of them.
+
+    `occurred_at` defaults to the payment's own `detected_at` — the instant
+    Razorpay recorded the failure, not the instant SAMPARK read it. That
+    keeps this event strictly before the `request.received` an agent later
+    raises against the same item, so ordering never falls through to the
+    `TYPE_ORDER` tiebreak.
+
+    Unsigned: no agent requested a payment failure.
+
+    `event_id` is keyed on the payment id, so re-ingesting the same payment —
+    a Razorpay webhook retry, a second poll, a judge pressing the button
+    twice — re-derives the SAME id and `chain.append` returns
+    `AlreadyAppended`. The chain never records one payment twice
+    (Phase 5A §3.1/§8.6's idempotency rule, unchanged).
+
+    Every payload string is a Razorpay id, an ASCII enum value or an ISO
+    timestamp, so it passes `sampark.audit.canonical`'s
+    `_SAFE_PAYLOAD_STRING_RE`. The customer's phone and email are NOT
+    carried, in any form: only the hash-derived `customer_id` reaches the
+    payload (Phase 5A §10 privacy rule).
+    """
+    provenance = opportunity.provenance.as_payload()
+    return _draft(
+        PAYMENT_RISK_DETECTED,
+        event_id_for(PAYMENT_RISK_DETECTED, opportunity.payment_id),
+        occurred_at if occurred_at is not None else opportunity.detected_at,
+        None,
+        PAYMENT_FAILED_REASON,
+        {
+            "payment_id": opportunity.payment_id,
+            "order_id": opportunity.order_id,
+            "payment_link_id": opportunity.payment_link_id,
+            "method": opportunity.method,
+            "risk_id": opportunity.risk_id,
+            "customer_id": opportunity.customer_id,
+            "source": opportunity.risk_item.source,
+            "amount_paise": opportunity.amount_paise,
+            "currency": opportunity.currency,
+            "root_cause": opportunity.root_cause,
+            "context_code": opportunity.context_code,
+            "failure_code": opportunity.failure_code,
+            "failure_reason": opportunity.failure_reason,
+            "failure_source": opportunity.failure_source,
+            "failure_step": opportunity.failure_step,
+            "detected_at": iso_utc_micros(opportunity.detected_at),
+            "provider": provenance["provider"],
+            "environment": provenance["environment"],
+            "transport": provenance["transport"],
+            "operation": provenance["operation"],
+        },
+    )
+
 
 
 # --- Phase 7 (spec §8.9) ---------------------------------------------------

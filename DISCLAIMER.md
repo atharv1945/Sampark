@@ -347,6 +347,80 @@ or logged at any point. The `person_id` never crosses into a ledger row.
   introduced, because making those tests skip without an owner decision would
   undo the reason the PostgreSQL service was added to CI in the first place.
 
+## 19A. The Razorpay integration — what it is and is not
+
+**DEMONSTRATED:** a Razorpay **Test Mode** integration. The payment link, the
+payment, the failure, the failure code and the customer contact details all
+come from Razorpay's test environment through Razorpay's own API — via the
+Razorpay MCP Server when a token is configured, otherwise the REST test API,
+and the surface always says which.
+
+**NOT VALIDATED, and asserted nowhere:**
+
+- **SAMPARK is not deployed inside Razorpay.** This is a *proposed*
+  integration. Razorpay does not use it, has not reviewed it, and no
+  relationship is implied by the use of its test API.
+- **No real money moves anywhere in this repository.**
+  `sampark.integrations.razorpay.RazorpayConfig.from_env` refuses any key id
+  that does not begin `rzp_test_`, and
+  `sampark.integrations.provenance.Environment` has no `LIVE` member at all —
+  a live-mode operation cannot even be described by this code.
+- **Production volume, latency and concurrency are unmeasured** for this path.
+  The product flow decides one payment at a time on a request thread. No load
+  test exists, and p99 decision latency remains NOT MEASURED (§19).
+- **The channel is still mocked** (§11). A grant issued for a real Razorpay
+  failure results in a logged payload, never an SMS.
+
+**ARCHITECTURAL CAPABILITY, exercised but not at scale:** the webhook receiver.
+Its HMAC-SHA256 verification is real and tested against genuine signatures, but
+this repository has never had Razorpay deliver to it over the public internet —
+a local demo has no public URL. The polling path (`/ingest`) is what the demo
+actually uses.
+
+### What the webhook signature does NOT prove
+
+Razorpay's scheme is `HMAC-SHA256(raw_body, secret)` and nothing more. A
+verified body proves it was produced by someone holding the secret and was not
+altered. It does **not** prove who sent it, **when** it was sent (no timestamp
+is covered, so a captured valid body is replayable), or that the merchant
+account matches. Replay is handled by idempotency rather than by a freshness
+check the format does not support. No mechanism Razorpay does not offer is
+invented.
+
+### The ₹1,000 decline is a property of the frozen model, not of reality
+
+The demo's headline — a ₹1,000 failed payment declined with
+`allocation.negative_expected_net` — follows from constants calibrated against
+**synthetic** Arm A data (§1, §2). The break-even of roughly ₹1,978 is a
+statement about this simulator's world: mean at-risk amount 387,607 paise,
+λ = 0.13569 arrivals per customer-day, `DECAY = 0.848`. **A real merchant's
+break-even would be a different number**, and possibly a very different one.
+
+What transfers is the *mechanism* — that recovery capacity is a scarce shared
+resource with a computable opportunity cost, and that a decision layer can
+price it. What does not transfer is the number.
+
+### Identity resolution is hash-based and best-effort
+
+Two payments unify onto one customer when they share a phone or email hash
+(§8.2's rule, applied incrementally against the ledger). A customer who pays
+once with a different phone and a different email will appear as two rows, and
+their contact budget will not be shared. This is inherent to hash-only
+identity resolution without a merchant-side customer id; it is not fixed here.
+
+### Root causes come from a lookup table that was written for the simulator
+
+`sampark/rootcause/taxonomy.yaml` is committed and deliberately unmodified by
+this integration (changing it would change the Phase 1 dataset). Three of its
+`failed_payment` context codes happen to be Razorpay's real `error_code`
+vocabulary and two more match `error_reason` values once uppercased; **the rest
+of Razorpay's failure vocabulary resolves to `unknown`**. `unknown` is a genuine
+calibrated bucket, not an error — but a production deployment would want a
+taxonomy written against Razorpay's real code list rather than one that
+overlaps it.
+
+---
+
 ## 20. Single-merchant scope
 
 Cross-merchant contact fatigue — the same human being recovered by four

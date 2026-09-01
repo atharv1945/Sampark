@@ -54,6 +54,36 @@ on a `recovery.credited` payload, never as its own event (design lock §2.18).
                           failure, matching `agent.registered`'s and
                           `holdout.assigned`'s existing unsigned precedent.
 
+**The Razorpay product-integration layer adds ONE type, and only one:**
+
+    payment.risk_detected — a payment event arriving from Razorpay (test
+                          mode) was normalised into a RiskItem and entered
+                          the at-risk ledger. This is the ONLY genuinely new
+                          fact the integration produces: everything after it
+                          (request, scope denial, decision, reservation,
+                          lifecycle) is an existing type emitted by the
+                          unmodified Phase 3/4/5 path, because a normalised
+                          Razorpay opportunity IS a RiskItem and nothing
+                          downstream can tell where it came from.
+
+                          It exists so the chain, not the UI, is what says
+                          the money at risk came from Razorpay: without it
+                          the provenance would live only in `risk_items` and
+                          the screen would be asserting something the audit
+                          log could not corroborate — precisely the
+                          second-code-path failure §12.1 forbids.
+
+                          Unsigned: no agent asked for a payment to fail, so
+                          there is no signature to attach. Same precedent as
+                          `agent.registered`, `holdout.assigned` and
+                          `model.degraded`.
+
+                          Carries NO request_id and NO window_id, so it never
+                          enters `events_for_request` or
+                          `events_for_customer_window` and cannot perturb
+                          `sampark.audit.explain`'s reconstruction of a
+                          request timeline or a contested window.
+
 Everything else Phase 8 renders REUSES an existing type. In particular the
 stage-two rate-ceiling denial (spec §12.3 failure 2) is a `decision.denied`
 carrying the reason code `agent.rate_ceiling_exceeded` — it IS a post-scope
@@ -92,6 +122,9 @@ RECOVERY_CREDITED = "recovery.credited"
 # --- Phase 8 addition (spec §12.3 failure 3) ---
 MODEL_DEGRADED = "model.degraded"
 
+# --- Razorpay product-integration addition (spec §8.2 normaliser) ---
+PAYMENT_RISK_DETECTED = "payment.risk_detected"
+
 EVENT_TYPES: frozenset[str] = frozenset(
     {
         AGENT_REGISTERED,
@@ -110,6 +143,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
         CONTACT_OPT_OUT,
         RECOVERY_CREDITED,
         MODEL_DEGRADED,
+        PAYMENT_RISK_DETECTED,
     }
 )
 
@@ -118,7 +152,14 @@ EVENT_TYPES: frozenset[str] = frozenset(
 # ones with no signed request behind them, plus holdout.assigned (Phase 7
 # — no agent behind an assignment decision).
 SIGNED_EVENT_TYPES: frozenset[str] = EVENT_TYPES - frozenset(
-    {AGENT_REGISTERED, AGENT_REVOKED, GRANT_EXPIRED, HOLDOUT_ASSIGNED, MODEL_DEGRADED}
+    {
+        AGENT_REGISTERED,
+        AGENT_REVOKED,
+        GRANT_EXPIRED,
+        HOLDOUT_ASSIGNED,
+        MODEL_DEGRADED,
+        PAYMENT_RISK_DETECTED,
+    }
 )
 
 # Legal successor types for one request/grant's lifecycle (Phase 5A §2.2).
@@ -157,6 +198,15 @@ TYPE_ORDER: dict[str, int] = {
     # fall through to the `event_id` tiebreak both explain.py and store.py
     # already apply.
     MODEL_DEGRADED: 0,
+    # The Razorpay ingestion event. Rank 0 for the same reason MODEL_DEGRADED
+    # holds it: it must sort STRICTLY BELOW every decision.* (rank 1) because
+    # it explains where the candidate came from, and STRICTLY ABOVE
+    # HOLDOUT_ASSIGNED's -1, which tests/audit/test_emit_phase7.py pins as the
+    # unique minimum. In practice it never needs the tiebreak at all — a
+    # payment's `created_at` strictly precedes the `issued_at` of the request
+    # an agent then raises against it, so `occurred_at` already orders it
+    # first.
+    PAYMENT_RISK_DETECTED: 0,
     REQUEST_RECEIVED: 0,
     REQUEST_DENIED_ON_SCOPE: 1,
     DECISION_DENIED: 1,

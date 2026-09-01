@@ -379,9 +379,11 @@ one and present it as settled.
 | 6 — Intelligence layer | CLOSED (evidence committed `b8f0efc`) |
 | 7 — Attribution & policy compiler | **ENGINEERING CLOSED.** Evidence preserved at the documented seed-42 scope. Design decisions recorded in `DECISIONS.md`. See the three-way distinction below — this is not the same claim as "nothing remains." |
 | 8 — Demo surface | **CLOSED.** FastAPI + SSE + vanilla-JS one-screen trace, deterministic ~40s replay, all three §12.3 failures, all seven §12.4 chaos controls. Implemented, tested, demonstrated live, decisions recorded in `DECISIONS.md`, and committed. One owner validation item remains open and is named below — it is not an engineering gap. |
+| 10 — Razorpay product integration | **ENGINEERING CLOSED.** Razorpay Test Mode adapter (MCP-preferred, REST fallback, HMAC-verified webhook), one additive audit event, product surface at `/`, Phase 8 replay moved to `/system`. Phase 4 protection intact; `results/`, `sim/`, `agents/`, `sampark/schema.sql`, `sampark/policy/`, `sampark/allocator/`, `sampark/budget/issuance.py` untouched. Three owner decisions outstanding — see `RAZORPAY_OWNER_DECISIONS_PROPOSAL.md`. |
 | 9 — Sensitivity sweep / final A-B-H table / `ARCHITECTURE.md` / `DISCLAIMER.md` | **ENGINEERING CLOSED.** 50-point precommitted sensitivity sweep (all 6 predictions PASS), canonical A/B/H table, `ARCHITECTURE.md`, `DISCLAIMER.md`, README front matter, `policies/README.md`. Phase 4 protection intact; `sampark/` untouched. One owner validation item (cold-viewer) still open from Phase 8. |
 
 **PHASES 0–9 ENGINEERING CLOSED. ONE OWNER VALIDATION ITEM REMAINS.**
+**PHASE 10 (Razorpay product integration) ENGINEERING CLOSED — see the block at the end of this section for what was and was not verified.**
 
 **Commit-hash note.** The Phase 6-8 commits were rewritten by an owner rebase
 after the Phase 8 session. Hashes cited in the historical narratives below
@@ -960,5 +962,112 @@ existing `*_PROPOSAL.md` convention.
 from Phases 0–8); whether to ship a commented `policies/activated.yaml`; CI
 runtime (the full suite now genuinely runs the ~1h40m Postgres holdout tests);
 and whether to supply an API key for a live compiler run.
+
+---
+
+**Phase 10 status (Razorpay product integration): ENGINEERING CLOSED.**
+Not a spec phase — an owner-directed product layer over the closed Phase 0-9
+system. It is ADDITIVE: no protected file changed, no domain contract
+redefined, no committed evidence regenerated, no test weakened.
+
+**What was built (all new, plus three additive edits):**
+`sampark/integrations/` — `provenance.py` (transport receipts),
+`razorpay_mcp.py` (JSON-RPC over streamable HTTP, stdlib only),
+`razorpay_rest.py` (fallback + the test-mode gate), `webhook.py` (HMAC-SHA256
+verification), `normalize.py` (payment -> RiskItem), `gateway.py` (transport
+selection). `sampark/demo/razorpay_product.py` (the flow).
+`ui/razorpay_session.py`, `ui/routes_razorpay.py`,
+`ui/static/{product.html,product.js,product.css}`.
+`scripts/verify_razorpay_product_flow.py`. `RAZORPAY_INTEGRATION.md`,
+`RAZORPAY_OWNER_DECISIONS_PROPOSAL.md`.
+Additive edits: `sampark/audit/event_types.py` (+`PAYMENT_RISK_DETECTED`),
+`emit.py` (+`event_for_payment_risk_detected`), `sink.py`
+(+`record_payment_risk_detected`); `ui/app.py` (mount + `/system` route),
+`ui/models.py` (two request models). `ui/static/index.html`,
+`ui/static/app.js` and `ui/sse.py` are BYTE-IDENTICAL — the Phase 8 screen
+moved route, not content, so every assertion in
+`tests/test_ui_renders_only_audit_events.py` still holds unmodified.
+
+**Verified live this session (every number from a real command):**
+- Razorpay MCP Server reached read-only: `razorpay-mcp-server 1.0.0`, **42
+  tools** offered; SAMPARK uses four (`create_payment_link`,
+  `fetch_payment_link`, `fetch_payment`, `fetch_all_payments`).
+- **ONE real MCP write**: a ₹1,000 test-mode payment link,
+  `plink_TWaH0xmcDtjrxY` / `https://rzp.io/rzp/7ytIgC19`, amount 100000 INR,
+  status `created`, provenance `transport: mcp`.
+- Test-mode cross-check PASSED: MCP and the `rzp_test_` REST key see the same
+  payment-link ledger, so the MCP credential is on the same account in test
+  mode. This is what makes the "Test Mode" claim about the MCP path checkable
+  rather than assumed.
+- `python -m sampark.audit.verify`: **VALID: True, 560 events, head
+  `bf4ad0d0...b18244`** — bit-identical to the Phase 8 value. The protected
+  chain was never written to.
+- `python -m sim.gate`: **PASS**, mean A 89387.38, mean B 156957.37, uplift
+  [1.7114, 1.8822], `constants_commit_sha aa87123...` — unchanged.
+- `git diff aa87123 HEAD` over the six protected paths: EMPTY. `results/`,
+  `sim/`, `agents/`, `sampark/schema.sql`, `policies/`, `DECISIONS.md`, and
+  Phase 8's `ui/static/index.html` / `app.js` / `styles.css` / `ui/sse.py`:
+  all UNMODIFIED (`git status --porcelain` over them is empty).
+- **Full regression, run fresh after every change in this session**
+  (`python -m pytest -q`): **1218 passed, 3 skipped**, exit 0, 9636.94s
+  (2:40:36). The 3 skips are the pre-existing, unrelated
+  `tests/budget/test_precheck.py` redis skips. 202 of those tests are new in
+  this phase (156 offline + 46 Postgres-backed).
+- Post-suite residue: NO demo schemas (`public` is the only schema);
+  `grants`, `grant_requests`, `contact_slot_claims`, `customer_margin_windows`
+  all at 0; `agents`/`capability_scopes` at 4 (the documented Arm-B-evidence-
+  runner pattern). `budget_windows` is now EMPTY — the suite's own teardown
+  removed the `2099-01-01` fixture artifact this file previously described as
+  inert residue, so that note is now stale in the tidy direction.
+- **A residue incident caused by THIS session, and its cause:** killing the
+  full suite mid-run (to restart it after a code change) twice left a stray
+  inert `public.budget_windows` row dated `2025-09-11` — a Phase 8 demo
+  window. It is the same failure mode the Phase 8 entry above records for
+  `2025-09-10`: a `DemoRunner` daemon thread outliving a SIGKILLed pytest,
+  which no `finally` block and no cooperative stop can prevent. Confirmed by
+  experiment: deleting the row and running `tests/demo` **to completion**
+  (97 passed) left ZERO residue, twice. Both stray rows were deleted; nothing
+  else was touched, and `public.audit_events` was never affected.
+
+**THE FINDING THAT SHAPES THE DEMO, and it is not a bug.** A ₹1,000 failed
+payment is DECLINED with `allocation.negative_expected_net`. With the frozen
+constants the fatigue term prices one contact's forward opportunity cost at
+54,120 paise, so break-even for a `failed_payment` is ≈₹1,978. Nothing was
+tuned. This is the strongest available answer to "why not just retry
+everything?" and to the prioritisation question, so it is the HEADLINE rather
+than something engineered around. A second, clearly-labelled contrast payment
+above the threshold (default ₹4,000) exists solely so the grant/execute/settle
+path is demonstrable at all, and a test recomputes the break-even from live
+constants so a moved constant fails the suite.
+
+**A real defect this phase found in its own new code:** the first
+implementation resolved customer identity per-payment, so two payments from
+one phone with different emails minted TWO customers — silently splitting the
+unified at-risk ledger every contact budget depends on. Caught by
+`tests/demo/test_razorpay_product_flow.py::test_two_payments_from_one_person_share_one_contact_budget`
+on the first Postgres run; fixed by reconciling against the ledger's own
+`customers` rows before writing. Recorded in
+`RAZORPAY_OWNER_DECISIONS_PROPOSAL.md` D-5, and its residual limit in
+`DISCLAIMER.md` §19A.
+
+**Deliberately scoped down, stated rather than skipped:**
+no live webhook delivery (a local demo has no public URL — the receiver is
+tested against genuine HMAC signatures but Razorpay has never delivered to it,
+recorded as ARCHITECTURAL CAPABILITY); no `initiate_payment`/S2S (a *failed*
+payment needs a human at the checkout with a failing test card, and nothing
+here fabricates one); no load test and no p99 latency (still NOT MEASURED);
+`sampark/rootcause/taxonomy.yaml` READ but never extended, so Razorpay codes it
+does not map resolve to `unknown` — a real calibrated bucket, not an error.
+
+**`DECISIONS.md` was NOT modified** (CLAUDE.md §13). Nine proposed decisions,
+three of them needing an explicit owner call, are in
+`RAZORPAY_OWNER_DECISIONS_PROPOSAL.md`.
+
+**Open owner items:** the contrast-payment resolution (D-6); the MCP token
+written into the gitignored `.env` (D-9); whether to exercise the webhook over
+a public tunnel. Plus everything already open from Phases 0-9, unchanged —
+notably Phase 8's cold-viewer criterion.
+
+---
 
 Update this section at each phase boundary.

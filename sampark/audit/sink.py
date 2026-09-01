@@ -48,6 +48,7 @@ from sampark.contracts import Agent, Grant, GrantDecision, GrantRequest
 
 if TYPE_CHECKING:
     from sampark.attribution.credit import Credit
+    from sampark.integrations.normalize import RecoveryOpportunity
 
 
 class AuditSink(Protocol):
@@ -104,6 +105,12 @@ class AuditSink(Protocol):
 
     def record_model_degraded(
         self, reason_code: str, scorer_before: str, scorer_after: str, window_id: date, at: datetime
+    ) -> None: ...
+
+    # --- Razorpay product integration (spec §8.2) ---
+
+    def record_payment_risk_detected(
+        self, opportunity: "RecoveryOpportunity", at: datetime | None = None
     ) -> None: ...
 
 
@@ -217,6 +224,19 @@ class PostgresAuditSink:
             self._conn,
             emit.event_for_model_degraded(reason_code, scorer_before, scorer_after, window_id, at),
         )
+
+    # --- Razorpay product integration (spec §8.2) ---
+    #
+    # Append-after-write, the same ordering `record_agent_registered` uses:
+    # `sampark.demo.razorpay_product` loads the normalised RiskItem into the
+    # ledger FIRST and records it here second, so the chain never claims a
+    # risk item the database does not have. Nothing on the Phase 4 decision
+    # path calls this — `mediate_window` is untouched by the integration.
+
+    def record_payment_risk_detected(
+        self, opportunity: "RecoveryOpportunity", at: datetime | None = None
+    ) -> None:
+        chain.append(self._conn, emit.event_for_payment_risk_detected(opportunity, at))
 
     def _lookup_grant_metadata(self, grant_id: uuid.UUID) -> tuple[uuid.UUID, uuid.UUID]:
         with self._conn.cursor() as cur:

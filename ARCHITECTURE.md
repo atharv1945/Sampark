@@ -48,6 +48,13 @@ logs the exact payload that *would* have been sent.
 authentication on the demo, real payment movement (Razorpay integration is
 `rzp_test_` only), and cross-merchant fatigue.
 
+**The Razorpay product layer** (`sampark/integrations/`, §15A) sits at the top
+of this boundary, not inside it: it translates Razorpay test-mode payment
+events into the existing `RiskItem` / `Customer` contracts and hands them to the
+unmodified decision path. It holds no domain type, no policy and no arithmetic.
+SAMPARK is **not** deployed inside Razorpay; this is a proposed integration
+against Test Mode.
+
 ### The two denial paths
 
 This is the whole architecture in one picture. A request can die in two places,
@@ -549,6 +556,140 @@ debt.
   no state and writes nothing.
 - **A button press is never an audit event.** What reaches the chain is the
   *effect*, once it changes a decision.
+
+---
+
+## 15A. Razorpay product integration
+
+`sampark/integrations/` + `sampark/demo/razorpay_product.py` + `ui/routes_razorpay.py`.
+
+Additive. No protected file changed, no domain contract redefined, no committed
+evidence regenerated. It adds **one** audit event type and nothing else to the
+vocabulary.
+
+### The verified call order
+
+This is what the code actually does, read off `RazorpayProductRun.ingest` — not
+the intended design.
+
+```mermaid
+flowchart TD
+    subgraph RZP["RAZORPAY — Test Mode"]
+        L["payment link<br/>(create_payment_link)"]
+        F["customer pays with a<br/>FAILING test card"]
+        E["payment.failed<br/>pay_xxx · amount · error_code"]
+        L --> F --> E
+    end
+
+    E -->|"webhook (HMAC-verified)"| A
+    E -->|"read back (MCP or REST)"| A
+
+    subgraph ADP["RAZORPAY ADAPTER — sampark/integrations/"]
+        A["gateway.find_failed_payment<br/>or webhook.verify_and_parse"]
+        A --> N["normalize.normalize_payment<br/>· rootcause.classify (YAML lookup)<br/>· identity.resolution (SHA-256 hashes)"]
+        N --> P["Provenance minted by the transport<br/>that ACTUALLY ran"]
+    end
+
+    P --> LG["_load_into_ledger<br/>· _existing_customer_id — one human, one row<br/>· sim.persistence.load_ledger"]
+    LG --> AE1["AUDIT: payment.risk_detected"]
+    AE1 --> RQ["_build_request<br/>agents.payment_retry constants<br/>agents.mediated.to_grant_request (Ed25519)"]
+    RQ --> AE2["AUDIT: request.received"]
+    AE2 --> SC{"registry.scope.evaluate_scope"}
+    SC -->|"out of scope"| D1["AUDIT: request.denied_on_scope<br/><b>the allocator never runs</b>"]
+    SC -->|"in scope"| MW["mediation.service.mediate_window"]
+
+    subgraph PH4["UNMODIFIED PHASE 4 DECISION PATH"]
+        MW --> HF{"hard_filter.filter_candidates<br/>11 rules, BEFORE scoring"}
+        HF -->|"inadmissible"| D2["AUDIT: decision.denied / deferred"]
+        HF -->|"admissible"| AL{"allocator.greedy.allocate_window<br/>expected_net = p̂·amount − cost − incentive − fatigue"}
+        AL -->|"expected_net ≤ 0<br/>or lost its window"| D3["AUDIT: decision.denied / deferred"]
+        AL -->|"wins"| IS["budget.issuance.issue_grant<br/>SERIALIZABLE"]
+    end
+
+    IS --> AE3["AUDIT: grant.reserved"]
+    AE3 --> EX["execute_grant → demo.provider.send<br/>(mocked channel, idempotent on grant_id)"]
+    EX --> AE4["AUDIT: grant.executing"]
+    AE4 --> S{"provider result"}
+    S -->|"delivered"| C["confirm_grant<br/>AUDIT: grant.confirmed"]
+    S -->|"exhausted"| RB["rollback_grant — margin + contact slot released<br/>AUDIT: grant.rolled_back"]
+
+    D1 --> UI
+    D2 --> UI
+    D3 --> UI
+    C --> UI
+    RB --> UI
+    UI["audit_events (hash-chained)<br/>→ SSE → product UI · /api/verify · explain"]
+```
+
+A deferred candidate is carried forward to the next window and re-enters
+`mediate_window` — the same loop `sim/arm_b.py` runs, at the same `decision_at`
+convention. Up to `MAX_WINDOWS = 4`.
+
+The Phase 8 **stage-two rate ceiling** (`sampark/demo/enforcement.py`) is
+deliberately NOT on this path: it belongs to the rogue-agent demonstration, and
+the product flow registers one honest agent.
+
+### The transport rule
+
+MCP is preferred; REST is the fallback; the label follows the transport that
+ran. `Transport.MCP` provenance can only be built from an `McpCallReceipt`, and
+that receipt is constructed in exactly one place — `RazorpayMcpClient.call_tool`,
+after a response with no `error` and no `isError`.
+`tests/integrations/test_provenance.py` asserts that call-site count across the
+whole tree by AST. A fallback therefore cannot keep an MCP label, and the
+frontend cannot invent one.
+
+Before any MCP **write**, `assert_same_test_ledger()` checks read-only that the
+MCP credential and the `rzp_test_` REST key see the same payment-link ledger.
+The REST side is test-mode by construction (`RazorpayConfig.from_env` refuses a
+non-`rzp_test_` key id), so a match transfers that guarantee. On a mismatch, MCP
+writes are withheld and the product falls back to REST, labelled.
+
+### The one new audit event
+
+`payment.risk_detected` — unsigned, no `request_id`, no `window_id`, carrying
+the normalised opportunity plus the Razorpay provenance. It exists so the
+**chain**, not the UI, is what says the money at risk came from Razorpay.
+Everything after it is an existing event type emitted by unmodified code,
+because a normalised opportunity **is** a `RiskItem` and nothing downstream
+knows where it came from.
+
+### The finding that shapes the product story
+
+A **₹1,000** failed payment is declined with `allocation.negative_expected_net`.
+The frozen fatigue term prices one contact's forward opportunity cost at 54,120
+paise, so break-even for a `failed_payment` is ≈ ₹1,978. Nothing was tuned; the
+constants are the protected Phase 4 ones.
+
+That is the product argument rather than a problem: SAMPARK declines to spend a
+customer's single contact slot on a recovery worth less than the future
+recoveries it would push down the decay curve. The demo therefore ships a
+second, clearly-labelled payment above the threshold so the grant path is
+demonstrable, and
+`tests/integrations/test_mcp_and_gateway.py::test_the_contrast_amount_is_separate_and_above_the_allocator_break_even`
+recomputes the break-even from live constants so a moved constant is caught.
+
+### Two surfaces, one system
+
+| Route | Surface | Data |
+|---|---|---|
+| `/` | product demo | **real** Razorpay Test Mode payments |
+| `/system` | Phase 8 replay | **synthetic**, committed seeded generator |
+
+Separate sessions, separate isolated schemas, separate SSE endpoints — so a
+synthetic replay's events can never appear beside real Razorpay ones.
+`tests/ui/test_product_surface.py` asserts the product page never reads the
+synthetic stream.
+
+### Failure modes
+
+Missing or invalid credentials, an unreachable MCP server, an unreachable REST
+API, an invalid webhook, a duplicate webhook, an already-processed payment, an
+unsupported payment state, a network timeout, and a failed recovery action each
+have their own path and their own status code — see
+[RAZORPAY_INTEGRATION.md](RAZORPAY_INTEGRATION.md) §10. A failed Razorpay
+connection cannot corrupt the chain: nothing is appended until the corresponding
+business action has been persisted, and every write goes to a throwaway schema.
 
 ---
 
