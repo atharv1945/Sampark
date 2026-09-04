@@ -433,27 +433,57 @@ def test_the_phase_8_page_loads_no_product_stylesheet():
         assert forbidden not in markup, "index.html loads " + forbidden
 
 
-def test_only_the_navigation_was_added_to_the_phase_8_page():
-    """Phase 8's screen moved route, not content. `app.js`, `styles.css` and
-    `ui/sse.py` — the files that actually carry the trace-integrity guarantee —
-    must be byte-identical, and `index.html` must differ ONLY by the nav."""
+# The Phase 8 commit. Anchoring to it rather than to HEAD makes the assertions
+# below permanent. An earlier version compared against HEAD and went VACUOUS the
+# moment the presentation layer was committed: the diff was then empty, so "the
+# addition contains no <script/fetch(/EventSource/auditState" was satisfied by
+# there being no addition at all. Against a fixed historical commit the diff can
+# never be empty, so the content assertions always have something to bite on.
+#
+# `9849126` is unaffected by the co-author-trailer rewrite, which only touched
+# Phase 9 and later, so this anchor did not move.
+PHASE8_SHA = "9849126"
+
+
+def _git_diff(*args: str) -> str:
     import subprocess
 
-    changed = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD", "--",
-         "ui/static/app.js", "ui/static/styles.css", "ui/sse.py"],
-        cwd=REPO, capture_output=True, text=True, check=True,
-    ).stdout.split()
-    assert changed == [], "Phase 8 trace files were modified: " + repr(changed)
-
-    diff = subprocess.run(
-        ["git", "diff", "-U0", "HEAD", "--", "ui/static/index.html"],
-        cwd=REPO, capture_output=True, text=True, check=True,
+    return subprocess.run(
+        ["git", "diff", *args], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout
+
+
+def test_only_the_navigation_was_added_to_the_phase_8_page():
+    """Phase 8's screen moved route, not content.
+
+    `app.js`, `styles.css` and `ui/sse.py` carry the actual trace-integrity
+    guarantee and must be BYTE-IDENTICAL to Phase 8. `index.html` may differ
+    only by additions, and those additions must be static markup — no script,
+    no fetch, no stream, no reference to the audit store.
+
+    Checked against the COMMITTED tree (`PHASE8_SHA..HEAD`), which is the
+    durable repository property and the one CI reproduces, and additionally
+    against the working tree, so an uncommitted edit to a trace file cannot sit
+    undetected on a developer machine either.
+    """
+    trace_files = ("ui/static/app.js", "ui/static/styles.css", "ui/sse.py")
+
+    committed = _git_diff("--name-only", PHASE8_SHA, "HEAD", "--", *trace_files).split()
+    assert committed == [], (
+        "Phase 8 trace files differ from the Phase 8 commit in the COMMITTED "
+        "tree: " + repr(committed)
+    )
+    worktree = _git_diff("--name-only", PHASE8_SHA, "--", *trace_files).split()
+    assert worktree == [], (
+        "Phase 8 trace files have uncommitted modifications: " + repr(worktree)
+    )
+
+    diff = _git_diff("-U0", PHASE8_SHA, "HEAD", "--", "ui/static/index.html")
     removed = [l for l in diff.splitlines() if l.startswith("-") and not l.startswith("---")]
-    assert removed == [], "index.html had lines REMOVED, not just the nav added: " + repr(removed)
+    assert removed == [], "index.html had lines REMOVED from Phase 8: " + repr(removed)
+
     added = [l[1:] for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
-    assert added, "no nav was added to index.html"
+    assert added, "index.html is unchanged from Phase 8 — the nav is missing"
     joined = "\n".join(added)
     assert "sk-nav" in joined and "navbar.css" in joined
     for token in ("<script", "auditState", "EventSource", "fetch("):

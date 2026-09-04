@@ -59,7 +59,8 @@ than worked around.
 
 ### A-4. The precommitment was committed before the sweep code existed
 
-`results/phase9_precommitment.json` is commit `eabdbd1`, made **before**
+`results/phase9_precommitment.json` is commit `982c53e` (`eabdbd1` before the
+co-author-trailer rewrite; same tree, new message), made **before**
 `sim/sensitivity.py` was written and before any result was observed. Its entire
 value is that ordering, and a test asserts the code's grid still matches it.
 

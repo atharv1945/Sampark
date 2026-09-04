@@ -32,8 +32,19 @@ def _public_state(conn):
 
 
 def test_a_full_demo_run_does_not_touch_the_protected_public_chain(raw_conn, demo_scenario):
+    # `public` is snapshotted, not required to be non-empty. This line used to
+    # read `assert before[0] > 0`, which asserted something about the DEVELOPER'S
+    # DATABASE rather than about the demo: those rows are the Phase 5B fixture
+    # residue documented in tests/audit/conftest.py, no project mechanism
+    # reproduces them, and fabricating them to satisfy an assertion is exactly
+    # what CLAUDE.md §8 forbids — so CI's clean database failed here.
+    #
+    # Nothing about the invariant is lost. The invariant is `after == before`,
+    # and it is if anything SHARPER on an empty chain, where a leaked row is the
+    # only row present rather than one in five hundred. What the guard was
+    # really for — proving the run was substantial enough for a leak to be
+    # possible — is asserted directly below against the demo's own chain.
     before = _public_state(raw_conn)
-    assert before[0] > 0, "expected the protected Phase 0-7 chain to be present"
 
     schema = isolation.create_demo_schema(raw_conn)
     try:

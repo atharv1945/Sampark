@@ -203,6 +203,17 @@ everywhere: **Live · Razorpay MCP**, **Live · SAMPARK**, **Simulated**, and
 **Architectural capability** (plus **Not demonstrated**). They are never
 blurred, and `tests/ui/test_product_surface.py` enforces that statically.
 
+**Recording a demo, or running this for the first time?**
+[**DEMO_GUIDE.md**](DEMO_GUIDE.md) is a click-by-click runbook written for
+someone who did not build this: setup, what every button does, the exact
+Razorpay test card, a timed recording script, the questions you will be asked,
+and a troubleshooting table. Start there.
+
+```bash
+python scripts/run_demo.py --check   # preflight: what is configured and what answered
+python scripts/run_demo.py           # loads .env, then serves on :8000
+```
+
 Check the integration without a browser:
 
 ```bash

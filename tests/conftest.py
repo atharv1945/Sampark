@@ -29,6 +29,24 @@ def _config_or_skip() -> PostgresConfig:
         pytest.skip("Postgres not configured: " + str(exc))
 
 
+@pytest.fixture()
+def public_conn():
+    """A plain connection on `public`, for tests that need to check what the
+    API REPORTS about the protected chain against what the chain actually
+    holds. Deliberately not search_path-adjusted: it reads `public` and only
+    `public`, and it never writes."""
+    config = _config_or_skip()
+    try:
+        conn = psycopg.connect(config.conninfo(), connect_timeout=5)
+    except psycopg.OperationalError as exc:
+        pytest.skip("Postgres not reachable: " + str(exc))
+    conn.autocommit = True
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 @pytest.fixture(scope="module")
 def demo_api():
     """(TestClient, connection-on-the-demo-schema) after one complete run."""

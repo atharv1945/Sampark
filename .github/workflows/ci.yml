@@ -40,8 +40,18 @@ jobs:
       POSTGRES_PASSWORD: sampark_ci
 
     steps:
+      # fetch-depth: 0 is REQUIRED, not a convenience. Several tests are
+      # assertions about history rather than about the checkout:
+      # tests/sim_sensitivity/test_phase4_protection.py diffs the Phase 4
+      # baseline (aa87123), the Phase 8 commit (9849126) and the last Phase 9
+      # commit against HEAD, and tests/ui/test_product_surface.py diffs
+      # ui/static/** against the Phase 8 commit. actions/checkout's default
+      # shallow fetch (depth 1) makes those commits unreachable, and the tests
+      # fail on a git error rather than on the property they exist to protect.
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Pinned to 3.11 to match the local .venv. tests/test_environment.py
       # asserts this at runtime, so a drift here fails the build loudly rather

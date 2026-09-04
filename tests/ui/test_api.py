@@ -14,11 +14,34 @@ pytestmark = pytest.mark.postgres
 # --------------------------------------------------------------- lifecycle
 
 
-def test_health_reports_the_protected_chain_read_only(api_client):
+def test_health_reports_the_protected_chain_read_only(api_client, public_conn):
+    """What the endpoint REPORTS must equal what `public.audit_events` actually
+    holds, and reading it must not change it.
+
+    This previously asserted `public_audit_event_count > 0`. That was an
+    assertion about the DEVELOPER'S DATABASE rather than about the endpoint:
+    the count is non-zero locally only because of the Phase 5B fixture residue
+    documented in tests/audit/conftest.py, which no project mechanism
+    reproduces and which CI's clean database therefore fails. Comparing the
+    reported count against a direct query instead tests what this test's own
+    name claims — that health reports the protected chain, read-only — at any
+    count including zero, and catches a stale, cached or fabricated figure that
+    `> 0` never could."""
+
+    def actual():
+        with public_conn.cursor() as cur:
+            cur.execute("SELECT count(*) FROM public.audit_events")
+            return cur.fetchone()[0]
+
+    before = actual()
     body = api_client.get("/api/health").json()
     assert body["postgres"] == "ok"
     assert body["public_audit_events_present"] is True
-    assert body["public_audit_event_count"] > 0
+    assert body["public_audit_event_count"] == before, (
+        "health misreports the protected chain size: reported "
+        + repr(body["public_audit_event_count"]) + ", actual " + repr(before)
+    )
+    assert actual() == before, "reading /api/health CHANGED public.audit_events"
     assert body["run_state"] == "idle"
 
 

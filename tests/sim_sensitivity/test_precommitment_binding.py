@@ -1,6 +1,7 @@
 """The precommitment must stay binding — Phase 9A.
 
-`results/phase9_precommitment.json` was committed (eabdbd1) BEFORE
+`results/phase9_precommitment.json` was committed (982c53e; eabdbd1 before the
+co-author-trailer rewrite, same tree) BEFORE
 `sim/sensitivity.py` existed and before any result was observed. Its value is
 entirely in that ordering, and that value evaporates if the grid in the code
 can quietly drift away from the grid in the committed file once results are in.

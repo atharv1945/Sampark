@@ -394,6 +394,42 @@ current equivalents are `b8f0efc` (Phase 6 evidence), `14905e7` (Phase 7) and
 silently rewritten; this note is the mapping. `aa87123` is unaffected and
 remains the Phase 4 protected baseline.
 
+**Second commit-hash note — the co-author-trailer rewrite.** Three commits
+carried a `Co-Authored-By: Claude ...` trailer. They were rewritten to remove
+only that trailer; author, committer, dates, subject, the rest of every message
+and — critically — every TREE OBJECT are unchanged, so no file content moved and
+no evidence was regenerated. The three rewritten commits and their three
+descendants therefore have new hashes:
+
+| Phase | Old | New |
+|---|---|---|
+| 9 — precommitment | `eabdbd1` | `982c53e` |
+| 9 — sweep + closure | `69a5cdc` | `3514c63` |
+| 9 — owner closure | `fdc3d64` | `7a5594c` |
+| 9 — last Phase 9 commit | `50260d0` | `aafde72` |
+| 10 — Razorpay product.js | `77b2eb6` | `aec87cf` |
+| 10b — overview page | `60fd7a5` | `f4d5e1a` |
+
+**Everything at or below `9849126` is untouched by this rewrite**, because the
+earliest rewritten commit sits above it. So `aa87123` (Phase 4 baseline),
+`9849126` (Phase 8), `14905e7` (Phase 7), `b8f0efc`/`fe45cef` (Phase 6) and
+`78f5850` all keep their hashes, and every protection anchored to them still
+names exactly the commit it always named.
+
+Only ONE test-consumed reference moved: `PHASE9_SHA` in
+`tests/sim_sensitivity/test_phase4_protection.py`, updated `50260d0` ->
+`aafde72`. Both ranges it feeds (`9849126..PHASE9_SHA` and `PHASE9_SHA..HEAD`)
+were verified to yield byte-identical file lists before and after.
+
+`results/*.json` still records `constants_commit_sha eabdbd16...` in six Phase 9
+files. That is FROZEN EVIDENCE METADATA and was deliberately NOT rewritten: it
+records what HEAD was when the sweep ran, no test asserts it, and editing
+committed results to match a later cosmetic rewrite is exactly the kind of
+retro-fitting the evidence discipline exists to prevent. The mapping above is
+how a reviewer resolves it. `DECISIONS.md`'s two `eabdbd1` mentions are left
+untouched for the same reason and because CLAUDE.md §13 reserves that file to
+the owner.
+
 The single item still outstanding anywhere in Phases 0-9 is Phase 8's
 cold-viewer criterion (spec §18.1: "someone who hasn't heard the pitch can
 watch it and tell you what got denied and why"). That is an OWNER VALIDATION
@@ -1119,6 +1155,31 @@ negative-controlled against `allocator/greedy.py`, `policy/hard/*`,
 `test_the_phase9_audit_surface_was_extended_and_never_reduced`, a git-free pin
 of all 16 Phase-9-era event types, 15 emitters and 15 sink methods, asserting
 the vocabulary grew by exactly `payment.risk_detected` and lost nothing.
+
+**A second test with the same premise decay, caught the same day.**
+`tests/ui/test_product_surface.py::test_only_the_navigation_was_added_to_the_phase_8_page`
+compared `git diff HEAD -- ui/static/index.html`. Once the owner committed
+`index.html`, that diff went EMPTY — and an empty diff satisfies "the addition
+contains no `<script`/`fetch(`/`EventSource`/`auditState`" vacuously. The test
+would have kept passing while asserting nothing. It surfaced only because the
+companion assertion ("no nav was added") failed loudly.
+
+Re-anchored to the Phase 8 commit `9849126` compared against the WORKING TREE.
+Verified directly: `9849126..HEAD` over `ui/static/index.html` is **28
+additions, 0 deletions**, and `ui/static/app.js`, `ui/static/styles.css` and
+`ui/sse.py` are byte-identical to `9849126`.
+
+**The general lesson:** `git diff HEAD -- X` asserts a property of the
+*uncommitted working tree*, not of the code. Every such assertion in this
+repository is now anchored to a named commit.
+
+**An operator runbook was added** — `DEMO_GUIDE.md`, written for someone who did
+not build this: setup, what every button does and why, the exact Razorpay test
+card, a timed recording script, the questions a judge will ask with answers, and
+a troubleshooting table. Plus `scripts/run_demo.py`, a launcher that loads
+`.env` (the app itself deliberately reads only the process environment, so a
+bare `uvicorn ui.app:app` dies at import) and prints a preflight of what is
+configured and what actually answered.
 
 **Verified after this layer.** Full regression, run fresh after every change:
 **1232 passed, 3 skipped**, exit 0, 7084.30s (1:58:04) — the 3 skips are the

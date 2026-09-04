@@ -60,7 +60,8 @@ Two consequences worth stating plainly:
 --- Grid provenance ---
 
 The grid, the anchor, the primary metric and six predictions were committed to
-`results/phase9_precommitment.json` in commit eabdbd1, BEFORE this file existed
+`results/phase9_precommitment.json` in commit 982c53e (eabdbd1 before the
+co-author-trailer rewrite; same tree, new message), BEFORE this file existed
 and before any result was observed — the same mechanism Phase 7 used for
 Decision 17. `tests/sim_sensitivity/test_precommitment_binding.py` asserts the
 constants below still equal that committed file, so the grid cannot drift after

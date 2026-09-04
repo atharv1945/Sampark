@@ -704,7 +704,8 @@ canonical bytes including signatures.
 > highest-trust move available to you, and almost nobody does it."*
 
 **Grid, anchor, primary metric and six predictions were committed to
-`results/phase9_precommitment.json` in commit `eabdbd1` — before
+`results/phase9_precommitment.json` in commit `982c53e` (`eabdbd1` before the
+co-author-trailer rewrite; same tree, new message) — before
 `sim/sensitivity.py` existed and before any result was observed.** A test
 (`tests/sim_sensitivity/test_precommitment_binding.py`) asserts the code's grid
 still equals that committed file, so it cannot drift once results are in.

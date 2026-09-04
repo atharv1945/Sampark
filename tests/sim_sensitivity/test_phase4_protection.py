@@ -38,7 +38,13 @@ PHASE4_SHA = "aa87123"
 # latter silently becomes an assertion about every later phase too, and expires
 # the moment one lands.
 PHASE8_SHA = "9849126"
-PHASE9_SHA = "50260d0"   # the last Phase 9 commit
+PHASE9_SHA = "aafde72"   # the last Phase 9 commit
+#
+# PHASE9_SHA was `50260d0` until the Claude co-author trailers were stripped
+# from the three Phase 9 commits. That rewrite changed the message, never the
+# tree: `50260d0` and `aafde72` have the IDENTICAL tree object, so both ranges
+# below name exactly the same content as before. PHASE4_SHA and PHASE8_SHA sit
+# BELOW the rewritten range and did not move at all.
 
 PROTECTED_PATHS = (
     "sampark/allocator/constants.py",

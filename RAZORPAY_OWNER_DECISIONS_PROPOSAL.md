@@ -294,6 +294,25 @@ against eight protected modules, all caught) and a git-free pin of the entire
 Phase 9 audit surface asserting it was extended by exactly one event type and
 lost nothing.
 
+**5. A second test with the same defect — and this one failed SILENTLY first.**
+`test_only_the_navigation_was_added_to_the_phase_8_page` compared
+`git diff HEAD -- ui/static/index.html` and asserted the additions contained no
+script, fetch or audit-store reference. That is correct only while the change is
+uncommitted. Once `index.html` was committed, the diff became EMPTY — and an
+empty diff satisfies "nothing forbidden was added" trivially. The test would
+have gone on passing while asserting nothing at all.
+
+It was caught because the *other* half of the same assertion ("no nav was added")
+then failed loudly. Re-anchored to the Phase 8 commit `9849126`, compared
+against the WORKING TREE, so it states a permanent fact: Phase 8's screen gained
+28 lines and lost none, and `app.js`, `styles.css` and `ui/sse.py` are
+byte-identical to Phase 8. Verified directly.
+
+**The general lesson, worth recording:** an assertion of the form
+`git diff HEAD -- X is empty/additive` is about *uncommitted work*, not about a
+property of the code. Three tests in this repository had that shape; all three
+are now anchored to a named commit.
+
 **OWNER DECISION REQUIRED:** confirm that re-anchoring a Phase 9 test to Phase
 9's own endpoint is the right call, rather than allowlisting Phase 10 inside
 the original HEAD-relative assertion.
